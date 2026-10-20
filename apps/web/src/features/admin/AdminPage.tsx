@@ -60,9 +60,10 @@ export function AdminPage() {
 function Coquille({ children, droite }: { children: React.ReactNode; droite?: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-[100dvh] max-w-console flex-col bg-bg">
-      <header className="barre">
-        <Link to="/" className="text-18 font-bold no-underline text-text">
-          Moutar
+      {/* La console : plus sobre, mêmes jetons — en-tête lavande (soft), cartes rondes. */}
+      <header className="barre border-primary-soft bg-primary-soft">
+        <Link to="/" className="marque">
+          <span className="marque-nom">Moutar</span>
         </Link>
         <span className="muet">· console</span>
         <span className="flex-1" />

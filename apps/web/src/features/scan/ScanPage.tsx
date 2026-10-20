@@ -4,6 +4,7 @@ import { Bandeau } from '../../components/Bandeau';
 import { Bouton } from '../../components/Bouton';
 import { Champ } from '../../components/Champ';
 import { BoutonRetour, Ecran, Marque } from '../../components/Ecran';
+import { Emoji } from '../../components/Emoji';
 import { lireCodeBarres, normaliserCodeLu, type ArretLecture } from './lecteur-code-barres';
 
 type Etat = { phase: 'demande' } | { phase: 'lecture' } | { phase: 'refus'; message: string } | { phase: 'manuel' };
@@ -92,7 +93,10 @@ export function ScanPage() {
         )
       }
     >
-      <h1 className="text-title font-bold">Photographier le produit</h1>
+      <h1 className="text-title font-bold">
+        Photographier le produit
+        <Emoji>📷</Emoji>
+      </h1>
       {manuel ? (
         <form className="flex flex-col gap-3" onSubmit={valider}>
           {etat.phase === 'refus' ? (
@@ -120,21 +124,27 @@ export function ScanPage() {
               {erreurSaisie}
             </Bandeau>
           ) : null}
-          <Bouton type="submit" variante="primaire" bloc>
+          <Bouton type="submit" variante="accent" accent={1} bloc>
             Vérifier ce produit
           </Bouton>
         </form>
       ) : (
         <>
-          <p className="muet">Visez le code-barres. La lecture se fait sur le téléphone : aucune image ne part.</p>
-          <div className="relative overflow-hidden rounded border border-border bg-surface-2" style={{ aspectRatio: '3 / 4' }}>
+          <p>Visez le code-barres, le reste se fait tout seul. La lecture reste sur votre téléphone : aucune image ne part.</p>
+          <div className="relative overflow-hidden rounded border border-border bg-surface-2 shadow" style={{ aspectRatio: '3 / 4' }}>
             <video ref={video} className="h-full w-full object-cover" playsInline muted autoPlay aria-label="Aperçu de la caméra" />
-            <div aria-hidden="true" className="pointer-events-none absolute inset-x-[12%] top-1/2 h-[30%] -translate-y-1/2 rounded-sm border-2 border-primary-on opacity-90" />
+            {/* Le viseur : quatre coins arrondis, un accent chacun (décoration ; le texte dessous dit quoi faire). */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-x-[10%] top-1/2 h-[32%] -translate-y-1/2">
+              <span className="viseur-coin viseur-coin-1" />
+              <span className="viseur-coin viseur-coin-2" />
+              <span className="viseur-coin viseur-coin-3" />
+              <span className="viseur-coin viseur-coin-4" />
+            </div>
           </div>
-          <p className="muet text-center" role="status">
-            {etat.phase === 'demande' ? 'Demande d’accès à la caméra…' : 'Lecture en cours… Centrez le code dans le cadre.'}
+          <p className="text-center font-bold" role="status">
+            {etat.phase === 'demande' ? 'Un instant, la caméra s’allume…' : 'Centrez le code entre les quatre coins : on lit.'}
           </p>
-          <p className="muet text-center">Le logo de certification (lot 3) et la liste d’ingrédients (lot 3) se liront bientôt sur la même photo.</p>
+          <p className="muet text-center">Bientôt, le logo de certification et la liste d’ingrédients se liront sur la même photo (lot 3).</p>
         </>
       )}
     </Ecran>

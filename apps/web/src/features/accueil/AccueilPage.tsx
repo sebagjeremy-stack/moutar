@@ -48,7 +48,8 @@ export function AccueilPage() {
       pied={
         <div className="flex w-full flex-col gap-2">
           <p className="muet px-2 text-center">Code-barres, logo de certification ou liste d’ingrédients : une seule photo suffit.</p>
-          <BoutonLien to="/scan" variante="primaire" grand bloc>
+          {/* Corail : l'action chaleureuse de la maquette (accent décoratif, jamais un sens). */}
+          <BoutonLien to="/scan" variante="accent" accent={1} grand bloc>
             <IconeAppareil className="h-7 w-7" />
             Photographier le produit
           </BoutonLien>
@@ -58,8 +59,9 @@ export function AccueilPage() {
       <h1 className="cache-visuel">Vérifier un produit</h1>
 
       <div className="grid grid-cols-2 gap-[10px] pt-1">
+        {/* Les deux voies secondaires : icône teintée d'un accent (décoration : le mot est à côté). */}
         <Bouton className="min-h-[56px]" aria-disabled="true" title="La dictée arrive au lot 4" onClick={(e) => e.preventDefault()}>
-          <IconeMicro className="h-[22px] w-[22px]" />
+          <IconeMicro className="h-[22px] w-[22px] text-accent-3-hover" />
           Dicter
         </Bouton>
         <Bouton
@@ -71,7 +73,7 @@ export function AccueilPage() {
             if (!ouvert) setTimeout(() => champ.current?.focus(), 0);
           }}
         >
-          <IconeCrayon className="h-[22px] w-[22px]" />
+          <IconeCrayon className={`h-[22px] w-[22px] ${ouvert ? 'text-primary-strong' : 'text-accent-2-hover'}`} />
           Écrire
         </Bouton>
       </div>
@@ -96,7 +98,7 @@ export function AccueilPage() {
           }}
         />
         <p className="muet" id="aide-produit">
-          Tapez le code sous les barres. La recherche par nom ou marque arrive au lot 2.
+          Tapez les chiffres sous les barres. La recherche par nom ou marque arrive au lot 2.
         </p>
         {erreur ? (
           <Bandeau ton="warn" role="alert">
@@ -109,6 +111,7 @@ export function AccueilPage() {
         <EnteteCarte
           id="titre-seuil"
           titre="Mon seuil"
+          emoji="🎯"
           action={
             <Link to="/seuil" className="lien no-underline hover:underline" aria-label="Modifier mon seuil">
               Modifier
@@ -122,10 +125,10 @@ export function AccueilPage() {
       </Carte>
 
       <Carte aria-labelledby="titre-derniers">
-        <EnteteCarte id="titre-derniers" titre="Derniers produits" />
+        <EnteteCarte id="titre-derniers" titre="Derniers produits" emoji="🛒" />
         <p className="muet mb-1">Gardés sur ce téléphone seulement.</p>
         {historique.length === 0 ? (
-          <p className="muet">Aucun produit vérifié sur ce téléphone pour l’instant.</p>
+          <p className="muet">Rien pour l’instant : votre premier produit vérifié s’affichera ici.</p>
         ) : (
           <ul className="liste" role="list">
             {historique.map((e) => (

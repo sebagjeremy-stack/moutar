@@ -8,7 +8,9 @@ import { Carte } from '../../components/Carte';
 import { Champ, ZoneTexte } from '../../components/Champ';
 import { BoutonRetour, Ecran, Marque } from '../../components/Ecran';
 import { IconeChevron, IconeImage } from '../../components/Icones';
+import { Emoji } from '../../components/Emoji';
 import { Pastille } from '../../components/Pastille';
+import { PastilleNumero } from '../../components/PastilleNumero';
 import { envoyer, lire } from '../../lib/api';
 import { formaterEan, formaterJour } from '../../lib/dates';
 import { lireSeuilLocal, noterDansHistorique } from '../../lib/stockage-local';
@@ -63,7 +65,7 @@ export function ProduitPage() {
         <h1 className="text-19 font-semibold">EAN {formaterEan(ean)}</h1>
         <Carte className="synthese-warn">
           <div className="mb-2 flex flex-wrap items-center gap-x-[10px] gap-y-2">
-            <h2 className="flex-1 text-17 font-semibold">Fiche non lue</h2>
+            <h2 className="flex-1 text-18 font-bold">Fiche non lue</h2>
             <Pastille ton="warn">Non lu</Pastille>
           </div>
           <p>{etat.message}</p>
@@ -102,11 +104,12 @@ function CarteProduitVue({ carte, barre }: { carte: CarteProduit; barre: React.R
       }
     >
       <section className="flex items-start gap-[14px]" aria-labelledby="nom-produit">
-        <div className="flex h-[76px] w-[76px] flex-none items-center justify-center overflow-hidden rounded-sm border border-border bg-surface-2 text-muted" aria-hidden="true">
+        {/* Vignette teintée lagon (décoration) */}
+        <div className="flex h-[76px] w-[76px] flex-none items-center justify-center overflow-hidden rounded-[20px] border border-border bg-accent-3-soft text-accent-3-hover" aria-hidden="true">
           {p.imageUrl ? <img src={p.imageUrl} alt="" className="h-full w-full object-cover" /> : <IconeImage className="h-7 w-7" />}
         </div>
         <div>
-          <h1 id="nom-produit" className="mb-[2px] text-19 font-semibold">
+          <h1 id="nom-produit" className="mb-[2px] text-19 font-bold">
             {p.nom}
           </h1>
           {p.marque ? <p className="font-semibold">{p.marque}</p> : null}
@@ -119,7 +122,7 @@ function CarteProduitVue({ carte, barre }: { carte: CarteProduit; barre: React.R
 
       <Carte className={CLASSE_SYNTHESE[synthese.ton]} aria-labelledby="titre-synthese">
         <div className="mb-2 flex flex-wrap items-center gap-x-[10px] gap-y-2">
-          <h2 id="titre-synthese" className="flex-auto text-17 font-semibold">
+          <h2 id="titre-synthese" className="flex-auto text-18 font-bold">
             Selon votre seuil : {libelleNiveau(carte.seuil)}
           </h2>
           <Pastille ton={synthese.ton}>{synthese.pastille}</Pastille>
@@ -136,8 +139,9 @@ function CarteProduitVue({ carte, barre }: { carte: CarteProduit; barre: React.R
       </Carte>
 
       <Carte aria-labelledby="titre-niveaux">
-        <h2 id="titre-niveaux" className="text-17 font-semibold">
+        <h2 id="titre-niveaux" className="text-18 font-bold">
           Les quatre niveaux
+          <Emoji>🧭</Emoji>
         </h2>
         <p className="muet mb-1">Une ligne par source, avec sa date et sa validité.</p>
         <ol className="liste" role="list">
@@ -149,7 +153,10 @@ function CarteProduitVue({ carte, barre }: { carte: CarteProduit; barre: React.R
 
       <details className="carte">
         <summary>
-          <h2 className="text-17 font-semibold">Ingrédients</h2>
+          <h2 className="text-18 font-bold">
+            Ingrédients
+            <Emoji>🧾</Emoji>
+          </h2>
           <IconeChevron className="chevron h-6 w-6 flex-none text-muted" />
         </summary>
         {ingredients ? (
@@ -176,36 +183,32 @@ function LigneNiveau({ ligne, ean, tagsIgnores }: { ligne: LigneCarte; ean: stri
   return (
     <li className="py-3">
       <div className="flex items-start gap-[10px]">
-        <span className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-full bg-surface-2 text-small font-bold" aria-hidden="true">
-          {ligne.niveau}
-        </span>
+        {/* Le numéro coloré est décoratif (« Niveau N » est écrit aux lecteurs d'écran) ; le statut est dans la pastille sémantique. */}
+        <PastilleNumero niveau={ligne.niveau} className="-mt-[2px]" />
         <div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-x-[10px] gap-y-[6px]">
-          <span className="flex-auto font-semibold">
-            <span className="cache-visuel">Niveau {ligne.niveau} · </span>
-            {libelleNiveau(ligne.niveau).split(' · ')[1]}
-          </span>
+          <span className="flex-auto font-display text-17 font-bold">{libelleNiveau(ligne.niveau).split(' · ')[1]}</span>
           <Pastille ton={ligne.ton} className="max-w-full">
             {ligne.pastille}
           </Pastille>
         </div>
       </div>
-      <p className="ml-[38px] mt-[6px]">{ligne.detail}</p>
+      <p className="ml-[42px] mt-[6px]">{ligne.detail}</p>
       {ligne.avertissement ? (
-        <Bandeau ton="warn" className="ml-[38px] mt-2">
+        <Bandeau ton="warn" className="ml-[42px] mt-2">
           {ligne.avertissement}
         </Bandeau>
       ) : null}
       {ligne.niveau === 4 && ligne.composition === null && ean ? (
-        <Link to={`/produit/${ean}/ingredients`} className="lien ml-[38px]">
+        <Link to={`/produit/${ean}/ingredients`} className="lien ml-[42px]">
           Saisir les ingrédients
         </Link>
       ) : null}
       {tagsIgnores > 0 ? (
-        <p className="muet ml-[38px] mt-[6px]">
+        <p className="muet ml-[42px] mt-[6px]">
           {tagsIgnores} additif{tagsIgnores > 1 ? 's' : ''} non lu{tagsIgnores > 1 ? 's' : ''} (tags Open Food Facts que le code ne sait pas lire).
         </p>
       ) : null}
-      {aVenir ? <p className="muet ml-[38px] mt-[6px]">{aVenir}</p> : null}
+      {aVenir ? <p className="muet ml-[42px] mt-[6px]">{aVenir}</p> : null}
     </li>
   );
 }
@@ -238,9 +241,12 @@ function ProduitInconnu({ ean, barre, surCree }: { ean: string; barre: React.Rea
 
   return (
     <Ecran barre={barre}>
-      <h1 className="text-title font-bold">Produit inconnu</h1>
+      <h1 className="text-title font-bold">
+        Produit inconnu
+        <Emoji>🔍</Emoji>
+      </h1>
       <p className="muet">EAN {formaterEan(ean)}</p>
-      <Bandeau ton="warn">Open Food Facts ne connaît pas ce code-barres. Créez la fiche à la main : l’EAN sera gardé pour la prochaine fois.</Bandeau>
+      <Bandeau ton="warn">Open Food Facts ne connaît pas encore ce code-barres. Créez la fiche à la main : l’EAN sera gardé pour la prochaine fois.</Bandeau>
       <form className="flex flex-col gap-3" onSubmit={creer}>
         <Champ id="nom" etiquette="Nom du produit" value={nom} onChange={(e) => setNom(e.target.value)} required maxLength={200} autoFocus />
         <Champ id="marque" etiquette="Marque (facultatif)" value={marque} onChange={(e) => setMarque(e.target.value)} maxLength={200} />
@@ -250,7 +256,7 @@ function ProduitInconnu({ ean, barre, surCree }: { ean: string; barre: React.Rea
             {erreur}
           </Bandeau>
         ) : null}
-        <Bouton type="submit" variante="primaire" bloc disabled={envoi}>
+        <Bouton type="submit" variante="accent" accent={1} bloc disabled={envoi}>
           {envoi ? 'Création…' : 'Créer la fiche'}
         </Bouton>
       </form>

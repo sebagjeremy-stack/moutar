@@ -5,6 +5,7 @@ import { Bandeau } from '../../components/Bandeau';
 import { Bouton } from '../../components/Bouton';
 import { ZoneTexte } from '../../components/Champ';
 import { BoutonRetour, Ecran, Marque } from '../../components/Ecran';
+import { Emoji } from '../../components/Emoji';
 import { envoyer } from '../../lib/api';
 import { formaterEan } from '../../lib/dates';
 
@@ -42,9 +43,12 @@ export function IngredientsPage() {
         </>
       }
     >
-      <h1 className="text-title font-bold">Scanner les ingrédients</h1>
+      <h1 className="text-title font-bold">
+        Scanner les ingrédients
+        <Emoji>🧾</Emoji>
+      </h1>
       <p className="muet">EAN {formaterEan(ean)}</p>
-      <Bandeau ton="info">La photo de l’étiquette et sa lecture automatique arrivent au lot 3. Pour l’instant, recopiez ou collez la liste d’ingrédients : le code croise les additifs avec la table de Moutar.</Bandeau>
+      <Bandeau ton="info">La photo de l’étiquette et sa lecture automatique arrivent au lot 3. En attendant, recopiez ou collez la liste d’ingrédients : le code croise les additifs avec la table de Moutar, ligne par ligne.</Bandeau>
       <form className="flex flex-col gap-3" onSubmit={analyser}>
         <ZoneTexte id="ingredients" etiquette="Liste d’ingrédients" aide="Telle qu’elle est écrite sur l’emballage, avec les codes E." value={texte} onChange={(e) => setTexte(e.target.value)} maxLength={5000} autoFocus />
         {erreur ? (
@@ -52,8 +56,8 @@ export function IngredientsPage() {
             {erreur}
           </Bandeau>
         ) : null}
-        <Bouton type="submit" variante="primaire" bloc disabled={envoi}>
-          {envoi ? 'Analyse…' : 'Analyser'}
+        <Bouton type="submit" variante="accent" accent={1} bloc disabled={envoi}>
+          {envoi ? 'Analyse…' : 'Analyser les ingrédients'}
         </Bouton>
       </form>
     </Ecran>

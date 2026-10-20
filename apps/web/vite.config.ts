@@ -19,8 +19,9 @@ export default defineConfig({
         lang: 'fr',
         start_url: '/',
         display: 'standalone',
-        background_color: '#f4f5f7',
-        theme_color: '#2f4fd8',
+        // Seules couleurs en dur du web (avec index.html) : égales aux jetons `--bg` et `--primary` (lavande) de global.css.
+        background_color: '#f6f1fb',
+        theme_color: '#7b58d9',
         icons: [{ src: '/icone.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: {

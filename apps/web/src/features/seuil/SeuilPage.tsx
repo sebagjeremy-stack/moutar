@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import type { Niveau } from '@moutar/shared-types';
 import { LIBELLES_NIVEAUX, NIVEAUX } from '@moutar/shared-types/regles/niveaux';
 import { Bouton } from '../../components/Bouton';
-import { Carte } from '../../components/Carte';
 import { BoutonRetour, Ecran, Marque } from '../../components/Ecran';
+import { Emoji } from '../../components/Emoji';
+import { PastilleNumero } from '../../components/PastilleNumero';
 import { ecrireSeuilLocal, lireSeuilLocal } from '../../lib/stockage-local';
 
 const EXPLICATIONS: Record<Niveau, string> = {
@@ -14,7 +15,10 @@ const EXPLICATIONS: Record<Niveau, string> = {
   4: 'Jusqu’à la composition seule — qui ne garantit rien : équipement, arômes, lait, vin ne s’y lisent pas.',
 };
 
-/** Mon seuil : quatre choix, gardé sur le téléphone. */
+/** Les classes en toutes lettres : Tailwind ne conserve que les noms qu'il lit dans les sources. */
+const CLASSE_CHOIX: Record<Niveau, string> = { 1: 'choix-seuil-1', 2: 'choix-seuil-2', 3: 'choix-seuil-3', 4: 'choix-seuil-4' };
+
+/** Mon seuil : quatre grandes cartes (un accent chacune, décoratif), celle choisie entourée de lavande et le mot « Choisi » écrit ; gardé sur le téléphone. */
 export function SeuilPage() {
   const navigate = useNavigate();
   const [seuil, setSeuil] = useState<Niveau>(() => lireSeuilLocal());
@@ -41,28 +45,34 @@ export function SeuilPage() {
         </Bouton>
       }
     >
-      <h1 className="text-title font-bold">Mon seuil</h1>
-      <p className="muet">Je m’arrête au niveau choisi : au-delà, une source ne fonde jamais un « permis ». Un « non cacher » se lit à tout niveau.</p>
-      <Carte>
-        <fieldset className="m-0 border-0 p-0">
-          <legend className="cache-visuel">Niveau</legend>
-          <ul className="liste" role="list">
-            {NIVEAUX.map((n) => (
+      <h1 className="text-title font-bold">
+        Mon seuil
+        <Emoji>🎯</Emoji>
+      </h1>
+      <p>Je m’arrête au niveau choisi : au-delà, une source ne fonde jamais un « permis ». Un « non cacher » se lit à tout niveau.</p>
+      <fieldset className="m-0 border-0 p-0">
+        <legend className="cache-visuel">Niveau</legend>
+        <ul className="flex flex-col gap-3" role="list">
+          {NIVEAUX.map((n) => {
+            const choisi = seuil === n;
+            return (
               <li key={n}>
-                <label className="flex min-h-tap cursor-pointer items-start gap-3">
-                  <input type="radio" name="seuil" value={n} checked={seuil === n} onChange={() => setSeuil(n)} className="mt-[5px] h-5 w-5 flex-none accent-primary" />
-                  <span>
-                    <span className="block font-semibold">
-                      Niveau {n} · {LIBELLES_NIVEAUX[n]}
+                <label className={`choix-seuil ${CLASSE_CHOIX[n]} ${choisi ? 'choix-seuil-choisi' : ''}`}>
+                  <input type="radio" name="seuil" value={n} checked={choisi} onChange={() => setSeuil(n)} className="cache-visuel" />
+                  <PastilleNumero niveau={n} className="mt-[2px]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <span className="font-display text-17 font-bold">{LIBELLES_NIVEAUX[n]}</span>
+                      {choisi ? <span className="text-small font-bold text-primary-strong">Choisi</span> : null}
                     </span>
-                    <span className="muet block">{EXPLICATIONS[n]}</span>
+                    <span className="block">{EXPLICATIONS[n]}</span>
                   </span>
                 </label>
               </li>
-            ))}
-          </ul>
-        </fieldset>
-      </Carte>
+            );
+          })}
+        </ul>
+      </fieldset>
     </Ecran>
   );
 }

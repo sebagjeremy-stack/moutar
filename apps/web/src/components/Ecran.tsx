@@ -13,9 +13,16 @@ export function Ecran({ barre, children, pied, className = '' }: { barre: ReactN
   );
 }
 
-/** Le nom de l'application dans la barre (jeton `--app-name` de la maquette : ici, le texte). */
+/**
+ * Le nom de l'application dans la barre (jeton `--app-name` de la maquette : ici, le texte) : police ronde, surligneur
+ * soleil sous le nom, un point corail après (`.marque::after`) — la touche d'accent de la marque, décorative.
+ */
 export function Marque({ centre = false }: { centre?: boolean }) {
-  return <span className={`flex-1 text-18 font-bold tracking-[.01em] ${centre ? 'text-center' : ''}`}>Moutar</span>;
+  return (
+    <span className={`marque flex-1 ${centre ? 'justify-center' : ''}`}>
+      <span className="marque-nom">Moutar</span>
+    </span>
+  );
 }
 
 export function BoutonRetour({ to = '/' }: { to?: string }) {
