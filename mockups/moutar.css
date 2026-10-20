@@ -1,0 +1,96 @@
+/* Moutar — jetons de design des maquettes (une seule source ; jamais une couleur en dur dans les pages). */
+:root {
+  --app-name: "Moutar";
+  /* Surfaces et texte */
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --text: #15181d;
+  --muted: #5b6370;        /* 4.6:1 sur --surface */
+  --border: #d5d9e0;
+  --input: #8d95a3;         /* bordure de champ ≥ 3:1 */
+  /* Accent (marque) */
+  --primary: #2f4fd8;
+  --primary-strong: #2340b8;
+  --on-primary: #ffffff;
+  --primary-soft: #e7ebfb;
+  /* Sémantique — le mot s'écrit toujours à côté de la couleur */
+  --ok: #1b7f4c;            /* permis selon la source */
+  --ok-soft: #e3f3ea;
+  --warn: #9a5b00;          /* non vérifié, périmé, en attente */
+  --warn-soft: #fff1d6;
+  --danger: #b3261e;        /* non cacher, danger — RÉSERVÉ */
+  --danger-soft: #fbe5e3;
+  --neutral: #5b6370;       /* non concerné */
+  --neutral-soft: #eef0f3;
+  /* Forme */
+  --radius: 14px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(21, 24, 29, .06), 0 4px 12px rgba(21, 24, 29, .06);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fs-body: 16px;          /* jamais moins sur mobile */
+  --fs-small: 14px;
+  --fs-title: 22px;
+  --tap: 48px;              /* cible tactile minimale */
+  --gutter: 16px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1217; --surface: #181c23; --surface-2: #222733;
+    --text: #eceff4; --muted: #a3acba; --border: #2e3542; --input: #6f7a8b;
+    --primary: #8ea2ff; --primary-strong: #a9b8ff; --on-primary: #0f1217; --primary-soft: #232b4a;
+    --ok: #6fd39a; --ok-soft: #163424;
+    --warn: #f3b955; --warn-soft: #3b2a0c;
+    --danger: #ff8a80; --danger-soft: #3f1a18;
+    --neutral: #a3acba; --neutral-soft: #222733;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: var(--fs-body)/1.45 var(--font);
+}
+/* Cadre téléphone : la page EST l'écran (pas de faux cadre) ; largeur bornée sur grand écran. */
+.ecran { max-width: 430px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
+.contenu { flex: 1; padding: var(--gutter); display: flex; flex-direction: column; gap: 12px; }
+/* Barre haute */
+.barre { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 var(--gutter); background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 2; }
+.barre .marque { font-weight: 700; font-size: 18px; letter-spacing: .01em; }
+.barre .marque::before { content: var(--app-name); }
+/* Cartes */
+.carte { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px var(--gutter); }
+.carte h2, .carte h3 { margin: 0 0 6px; font-size: 17px; }
+.muet { color: var(--muted); font-size: var(--fs-small); }
+/* Boutons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--tap); padding: 0 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.btn-primaire { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.btn-primaire:hover { background: var(--primary-strong); }
+.btn-bloc { width: 100%; }
+.btn-grand { min-height: 64px; font-size: 18px; }
+/* Champs */
+.champ { width: 100%; min-height: var(--tap); padding: 10px 14px; border: 1px solid var(--input); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; }
+.champ::placeholder { color: var(--muted); }
+.champ:focus-visible { outline: 3px solid var(--primary); outline-offset: 1px; }
+/* Pastilles de statut — le libellé est OBLIGATOIRE dans la pastille */
+.pastille { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-small); font-weight: 600; line-height: 1.3; }
+.pastille::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pastille-ok { color: var(--ok); background: var(--ok-soft); }
+.pastille-warn { color: var(--warn); background: var(--warn-soft); }
+.pastille-danger { color: var(--danger); background: var(--danger-soft); }
+.pastille-neutre { color: var(--neutral); background: var(--neutral-soft); }
+/* Bandeau d'avertissement (ambre : jamais rouge pour un simple « non vérifié ») */
+.bandeau { padding: 10px 14px; border-radius: var(--radius-sm); font-size: var(--fs-small); border: 1px solid transparent; }
+.bandeau-warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.bandeau-info { background: var(--primary-soft); color: var(--primary-strong); }
+/* Séparateur, listes */
+.liste { list-style: none; margin: 0; padding: 0; }
+.liste > li { padding: 10px 0; border-top: 1px solid var(--border); }
+.liste > li:first-child { border-top: 0; }
+/* Barre basse (actions sous le pouce) */
+.pied { position: sticky; bottom: 0; padding: 10px var(--gutter) calc(10px + var(--safe-bottom)); background: var(--surface); border-top: 1px solid var(--border); display: flex; gap: 10px; }
+.cache-visuel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
