@@ -1,0 +1,24 @@
+{
+  "name": "moutar",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Moutar — vérifier la cacherout d'un produit de grande distribution (usage familial, données non sensibles)",
+  "packageManager": "pnpm@11.5.2",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "db:start": "bash scripts/dev-db.sh start",
+    "db:stop": "bash scripts/dev-db.sh stop",
+    "db:migrate": "pnpm --filter @moutar/api db:migrate",
+    "db:generate": "pnpm --filter @moutar/api db:generate",
+    "db:seed-admin": "pnpm --filter @moutar/api db:seed-admin",
+    "dev": "pnpm db:start && concurrently -n api,web -c blue,green \"pnpm --filter @moutar/api dev\" \"pnpm --filter @moutar/web dev\"",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3"
+  }
+}

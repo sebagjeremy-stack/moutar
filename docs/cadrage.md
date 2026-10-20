@@ -32,7 +32,7 @@ Nom, marque, photo OFF. Puis 4 lignes, une par niveau : « Oui (source, date) »
 Un produit absent d'Open Food Facts se crée à la main (nom, marque) ou par la photo des ingrédients ; l'EAN est gardé pour la prochaine fois.
 
 ## 5. Stack (celle de Kora, reprise)
-PWA React + Vite + Tailwind (design system de Kora réutilisé, sobriété), API NestJS + PostgreSQL + Drizzle, moteur IA = OVHcloud AI Endpoints (vision pour le logo, OCR). Hébergement simple (OVH VPS ou Vercel + Postgres managé) : pas de HDS. Catalogues (certificateurs, additifs) EN CODE et testés.
+PWA React + Vite + Tailwind (direction visuelle fun et colorée, décidée le 20/10/2026, maquette `mockups/*-fun.html`), API NestJS + PostgreSQL + Drizzle, moteur IA = OVHcloud AI Endpoints (vision pour le logo, OCR). Hébergement simple (OVH VPS ou Vercel + Postgres managé) : pas de HDS. Catalogues (certificateurs, additifs) EN CODE et testés.
 
 ## 6. Modèle de données (esquisse)
 `certificateur` (code, nom, pays, logos, niveau de reconnaissance) · `produit` (ean, nom, marque, source OFF) · `verdict` (produit ou marque ou rubrique, niveau 1-4, rite, source, mention, date, valable_jusqu_au, statut) · `liste_officielle` + `import_liste` (fichier, date, lignes) · `additif` (E, nom, rite, statut, source) · `contribution` (utilisateur, verdict proposé, preuve, validé par).
@@ -51,6 +51,14 @@ PWA React + Vite + Tailwind (design system de Kora réutilisé, sobriété), API
 3. Certificateurs v1 : dix proposés (Beth Din de Paris, Rav Wolff, Badatz Eda Haredit, OU, OK, Star-K, Kof-K, KLBD, Rabbinat de Hollande, Rabbinat de Milan) — à compléter par le médecin-utilisateur avec ceux qu'il croise en rayon.
 4. Pessah hors v1. Seuil par défaut : niveau 2. Hébergement décidé au lot 2.
 5. Contraintes : la session cloud n'atteint ni Open Food Facts, ni le Consistoire, ni Chiourim ; les imports réels et les essais sur un vrai produit se font sur le Mac ; les PDF des listes déposés dans `docs/sources/` se traitent depuis le cloud.
+
+## 10. Console d'administration (GO du 20/10/2026)
+Accès par login + mot de passe (compte créé par `db:seed-admin`, mot de passe affiché une fois). Pages : additifs (statut, source, note par ligne : le médecin-utilisateur confirme ligne par ligne le catalogue), certificateurs, listes officielles (import, dates, validité), produits lus, contributions à valider (lot 5), journal (lecture seule). Toute écriture est journalisée. Aucune donnée personnelle n'y transite.
+
+## 11. Moteur d'IA (GO du 20/10/2026)
+Question posée : faut-il une API Anthropic ou OpenAI ? **Non.** L'endpoint OVHcloud AI Endpoints déjà connecté (compatible OpenAI, hébergé en UE) couvre les trois besoins : vision (`Qwen2.5-VL-72B-Instruct` : reconnaître un logo de certification, lire une liste d'ingrédients), audio (`whisper-large-v3-turbo` en secours de la dictée du navigateur), texte (`gpt-oss-120b` pour nettoyer un texte lu). Le code-barres, Open Food Facts et l'analyse des additifs n'appellent aucun modèle. Un fournisseur compatible OpenAI (OpenAI, ou Anthropic par passerelle) se brancherait par `IA_BASE_URL` sans changer le code ; à revoir seulement si la qualité de lecture des logos s'avère insuffisante.
+
+**Complément (20/10/2026, question « pourquoi pas Claude ou ChatGPT ? »)** : Claude est attendu meilleur sur la vision (petits caractères, petits logos) et le coût est négligeable à l'échelle familiale (Opus 5.5 : 4 $ / 20 $ par million de jetons, soit de l'ordre de 1,50 $ pour 100 photos par mois ; Sonnet 5.5 et Haiku 5.5 moins encore). Décision : deux fournisseurs derrière le même module — OVH par défaut, Claude par le SDK officiel dès qu'une clé `ANTHROPIC_API_KEY` est posée par le médecin-utilisateur — et comparaison au lot 3 sur une dizaine de vraies photos. ChatGPT reste possible par l'interface compatible OpenAI, sans y être préféré.
 
 ## 9. Nom
 **Moutar** (מותר, « permis ») — retenu le 20/10/2026. Alternatives écartées : Scanacher, Kachérou, Tov !, Hekhsher.

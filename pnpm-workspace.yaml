@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Dépendances autorisées à exécuter leurs scripts d'installation (esbuild : binaire de Vite ; @nestjs/core : message post-install).
+allowBuilds:
+  '@nestjs/core': true
+  esbuild: true
