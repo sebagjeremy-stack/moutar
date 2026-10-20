@@ -5,11 +5,13 @@ import { DatabaseModule } from './database/database.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AnalyseModule } from './modules/analyse/analyse.module';
 import { CarteModule } from './modules/carte/carte.module';
+import { ListesModule } from './modules/listes/listes.module';
 import { ProduitsModule } from './modules/produits/produits.module';
+import { RechercheModule } from './modules/recherche/recherche.module';
 import { SanteController } from './modules/sante/sante.controller';
 
 @Module({
-  imports: [DatabaseModule, ProduitsModule, AnalyseModule, CarteModule, AdminModule],
+  imports: [DatabaseModule, ProduitsModule, AnalyseModule, ListesModule, CarteModule, RechercheModule, AdminModule],
   controllers: [SanteController],
   providers: [{ provide: APP_FILTER, useClass: FiltreErreurs }],
 })

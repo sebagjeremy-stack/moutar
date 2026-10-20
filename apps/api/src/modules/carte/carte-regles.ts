@@ -1,5 +1,7 @@
-import type { AnalyseComposition, LigneCarte, Produit } from '@moutar/shared-types';
+import type { AnalyseComposition, LigneCarte, Produit, SousLigneListe } from '@moutar/shared-types';
+import { calculerSynthese, type LigneSynthese } from '@moutar/shared-types/regles/synthese';
 import { AVERTISSEMENT_COMPOSITION, SOURCE_TABLE } from '../analyse/analyse-composition-regles';
+import { NOM_COURT_LISTE } from '../listes/correspondance-liste-regles';
 
 /**
  * Règles PURES des lignes de la carte (lot 1). Les niveaux 1 à 3 n'existent pas encore : ils disent « non vérifié »
@@ -21,21 +23,73 @@ export function ligneCertifie(): LigneCarte {
   };
 }
 
-export function ligneListeOfficielle(): LigneCarte {
-  return {
-    niveau: 2,
-    statut: 'non_verifie',
-    pastille: 'Non vérifié',
-    ton: 'warn',
-    source: null,
-    detail: 'Les listes du Consistoire de Paris et du Rav Wolff ne sont pas encore importées (lot 2).',
-    mention: null,
-    publieLe: null,
-    valableJusquAu: null,
-    composition: null,
-    avertissement: null,
-  };
+/**
+ * Niveau 2 (lot 2) : UNE ligne pour l'écran, qui porte ce que dit CHAQUE liste active (`sousLignes`). La pastille suit la
+ * meilleure sous-ligne : `cite` (vert, « Cité · Consistoire ») > `cite_par_rubrique` (vert, « Cité par rubrique », confiance
+ * plus faible, le détail le dit) > `perime` (ambre, « Cité · liste périmée ») > `non_cite` (neutre, « Non cité » — ce n'est
+ * pas un « non ») ; sans aucune liste active : « Non vérifié » (ambre, « aucune liste importée »).
+ */
+export function ligneListeOfficielle(sousLignes: SousLigneListe[] = []): LigneCarte {
+  const base = { niveau: 2 as const, composition: null, avertissement: null, sousLignes };
+  if (sousLignes.length === 0) {
+    return { ...base, statut: 'non_verifie', pastille: 'Non vérifié', ton: 'warn', source: null, detail: 'Aucune liste officielle importée : la console permet d’importer le Consistoire de Paris et le Rav Wolff.', mention: null, publieLe: null, valableJusquAu: null };
+  }
+  const detail = sousLignes.map((s) => s.detail).join(' ');
+  const citee = parConfiance(sousLignes).find((s) => s.statut === 'cite');
+  if (citee) {
+    return { ...base, statut: 'cite', pastille: `Cité · ${NOM_COURT_LISTE[citee.code]}`, ton: 'ok', source: citee.source, detail, mention: mentionSousLigne(citee), publieLe: citee.publieLe, valableJusquAu: citee.valableJusquAu };
+  }
+  const parRubrique = sousLignes.find((s) => s.statut === 'cite_par_rubrique');
+  if (parRubrique) {
+    return { ...base, statut: 'cite', pastille: `Cité par rubrique · ${NOM_COURT_LISTE[parRubrique.code]}`, ton: 'ok', source: parRubrique.source, detail, mention: mentionSousLigne(parRubrique), publieLe: parRubrique.publieLe, valableJusquAu: parRubrique.valableJusquAu };
+  }
+  const perimee = sousLignes.find((s) => s.statut === 'perime');
+  if (perimee) {
+    return { ...base, statut: 'perime', pastille: 'Cité · liste périmée', ton: 'warn', source: perimee.source, detail, mention: perimee.mention, publieLe: perimee.publieLe, valableJusquAu: perimee.valableJusquAu };
+  }
+  return { ...base, statut: 'non_cite', pastille: 'Non cité', ton: 'neutre', source: null, detail, mention: null, publieLe: null, valableJusquAu: null };
 }
+
+/**
+ * Ce que la synthèse lit du niveau 2 : UNE `LigneSynthese` PAR liste active (chacune avec sa validité), ou la ligne
+ * agrégée elle-même quand aucune liste n'est importée.
+ */
+export function lignesSyntheseNiveau2(ligne: LigneCarte): LigneSynthese[] {
+  const sousLignes = ligne.sousLignes ?? [];
+  if (sousLignes.length === 0) return [{ niveau: 2, statut: ligne.statut, source: ligne.source, mention: ligne.mention, composition: null, valableJusquAu: ligne.valableJusquAu }];
+  return parConfiance(sousLignes).map((s) => ({
+    niveau: 2,
+    statut: s.statut === 'non_cite' ? 'non_cite' : s.statut === 'perime' ? 'perime' : 'cite',
+    source: s.source,
+    mention: mentionSousLigne(s),
+    composition: null,
+    valableJusquAu: s.valableJusquAu,
+  }));
+}
+
+/** Les sous-lignes, confiance forte d'abord (tri stable : à confiance égale, l'ordre des listes). */
+function parConfiance(sousLignes: SousLigneListe[]): SousLigneListe[] {
+  const rang = (s: SousLigneListe): number => (s.confiance === 'forte' ? 0 : s.confiance === 'faible' ? 1 : 2);
+  return [...sousLignes].sort((a, b) => rang(a) - rang(b));
+}
+
+/**
+ * La mention d'une sous-ligne pour une pastille : une marque citée sous une rubrique étrangère au nom du produit (confiance
+ * faible) le dit (« rubrique « BISCUITS SECS » : à vérifier ») ; « cité par rubrique » aussi (« rubrique « YAOURTS », toute
+ * marque · lait non surveillé »). La synthèse l'affiche derrière « Permis · ».
+ */
+export function mentionSousLigne(s: SousLigneListe): string | null {
+  if (s.statut === 'cite' && s.confiance === 'faible' && s.ligne) {
+    const averti = `rubrique « ${s.ligne.rubrique} » : à vérifier`;
+    return s.mention ? `${s.mention} · ${averti}` : averti;
+  }
+  if (s.statut !== 'cite_par_rubrique') return s.mention;
+  const rubrique = s.ligne ? `rubrique « ${s.ligne.rubrique} », toute marque` : 'toute marque dans la rubrique';
+  return s.mention ? `${rubrique} · ${s.mention}` : rubrique;
+}
+
+// `calculerSynthese` est réexporté pour que le service n'importe la synthèse qu'une fois (par les règles de la carte).
+export { calculerSynthese };
 
 export function ligneCommunautaire(): LigneCarte {
   return {

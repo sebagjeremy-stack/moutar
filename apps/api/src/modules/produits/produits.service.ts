@@ -6,6 +6,7 @@ import { loadEnv } from '../../config/env';
 import type { Database } from '../../database/client';
 import { DRIZZLE } from '../../database/database.module';
 import { produit } from '../../database/schema';
+import { normaliser } from '@moutar/shared-types/regles/normalisation';
 import { extraireCodesE } from '../analyse/analyse-composition-regles';
 import { lireFicheOff, type FicheOff } from './off-client';
 
@@ -26,6 +27,11 @@ export function versProduit(l: LigneProduit): Produit {
     source: l.source,
     luLe: l.luLe.toISOString(),
   };
+}
+
+/** Les colonnes normalisées de la recherche (lot 2), tenues à CHAQUE écriture du nom ou de la marque. */
+export function normes(nom: string, marque: string | null): { nomNorm: string; marqueNorm: string } {
+  return { nomNorm: normaliser(nom), marqueNorm: normaliser(marque) };
 }
 
 export interface CreationManuelle {
@@ -79,7 +85,7 @@ export class ProduitsService {
     }
     const [l] = await this.db
       .insert(produit)
-      .values({ ean: c.ean, nom: c.nom, marque: c.marque, ingredientsTexte: c.ingredientsTexte, additifs: c.ingredientsTexte ? extraireCodesE(c.ingredientsTexte) : [], source: 'manuel' })
+      .values({ ean: c.ean, nom: c.nom, marque: c.marque, ...normes(c.nom, c.marque), ingredientsTexte: c.ingredientsTexte, additifs: c.ingredientsTexte ? extraireCodesE(c.ingredientsTexte) : [], source: 'manuel' })
       .returning();
     return versProduit(l);
   }
@@ -106,10 +112,10 @@ export class ProduitsService {
   private async enregistrerFicheOff(f: FicheOff): Promise<LigneProduit> {
     const [l] = await this.db
       .insert(produit)
-      .values({ ean: f.ean, nom: f.nom, marque: f.marque, imageUrl: f.imageUrl, ingredientsTexte: f.ingredientsTexte, additifs: f.additifs, source: 'off' })
+      .values({ ean: f.ean, nom: f.nom, marque: f.marque, ...normes(f.nom, f.marque), imageUrl: f.imageUrl, ingredientsTexte: f.ingredientsTexte, additifs: f.additifs, source: 'off' })
       .onConflictDoUpdate({
         target: produit.ean,
-        set: { nom: f.nom, marque: f.marque, imageUrl: f.imageUrl, ingredientsTexte: f.ingredientsTexte, additifs: f.additifs, source: 'off', luLe: new Date(), updatedAt: new Date() },
+        set: { nom: f.nom, marque: f.marque, ...normes(f.nom, f.marque), imageUrl: f.imageUrl, ingredientsTexte: f.ingredientsTexte, additifs: f.additifs, source: 'off', luLe: new Date(), updatedAt: new Date() },
         setWhere: isNull(produit.deletedAt),
       })
       .returning();

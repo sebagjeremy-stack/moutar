@@ -59,6 +59,7 @@ function codeParDefaut(statut: number): string {
   if (statut === 401) return 'non_connecte';
   if (statut === 403) return 'refuse';
   if (statut === 404) return 'introuvable';
+  if (statut === 413) return 'fichier_trop_grand';
   if (statut === 429) return 'trop_de_demandes';
   return 'erreur';
 }
@@ -67,6 +68,7 @@ function messageParDefaut(statut: number): string {
   if (statut === 401) return 'Connexion requise.';
   if (statut === 403) return 'Accès refusé : cette session ne permet pas ce geste.';
   if (statut === 404) return 'Introuvable.';
+  if (statut === 413) return 'Le fichier envoyé est trop grand (10 Mo au plus).';
   if (statut === 429) return 'Trop de demandes : patientez un instant, puis réessayez.';
   return 'Erreur.';
 }

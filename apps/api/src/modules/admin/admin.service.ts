@@ -135,8 +135,16 @@ export class AdminService {
     return lignes.map((l) => ({ ...l, createdAt: l.createdAt.toISOString() }));
   }
 
-  /** La seule voie d'écriture du journal d'administration (ajout seul). */
-  private async journaliser(compteId: string | null, action: string, objet: string | null, detail: Record<string, unknown>): Promise<void> {
-    await this.db.insert(journalAdmin).values({ compteId, action, objet, detail });
+  /** La voie d'écriture du journal d'administration (ajout seul) ; `journaliserSur` pour écrire DANS une transaction. */
+  journaliser(compteId: string | null, action: string, objet: string | null, detail: Record<string, unknown>): Promise<void> {
+    return journaliserSur(this.db, compteId, action, objet, detail);
   }
+}
+
+/** Un exécuteur d'écriture : la base, ou la transaction en cours. */
+export type Executeur = Pick<Database, 'insert' | 'update' | 'select'>;
+
+/** La SEULE voie d'écriture du journal d'administration : une ligne, en ajout seul, sur la base ou dans une transaction. */
+export async function journaliserSur(executeur: Executeur, compteId: string | null, action: string, objet: string | null, detail: Record<string, unknown>): Promise<void> {
+  await executeur.insert(journalAdmin).values({ compteId, action, objet, detail });
 }

@@ -4,5 +4,5 @@ import { AdminConnexionController, AdminController } from './admin.controller';
 import { AdminGuard } from './admin.guard';
 import { AdminService } from './admin.service';
 
-@Module({ imports: [ProduitsModule], controllers: [AdminConnexionController, AdminController], providers: [AdminService, AdminGuard] })
+@Module({ imports: [ProduitsModule], controllers: [AdminConnexionController, AdminController], providers: [AdminService, AdminGuard], exports: [AdminService, AdminGuard] })
 export class AdminModule {}

@@ -15,6 +15,13 @@
       "when": 1792533416549,
       "tag": "0001_journal_truncate",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792534265423,
+      "tag": "0002_listes",
+      "breakpoints": true
     }
   ]
 }
