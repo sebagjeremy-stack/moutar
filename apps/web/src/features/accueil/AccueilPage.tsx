@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import type { LigneTrouvee } from '@moutar/shared-types';
 import { LIBELLES_NIVEAUX } from '@moutar/shared-types/regles/niveaux';
 import { Bandeau } from '../../components/Bandeau';
 import { Bouton, BoutonLien } from '../../components/Bouton';
@@ -9,13 +10,17 @@ import { IconeAppareil, IconeCrayon, IconeHistorique, IconeInfo, IconeMicro } fr
 import { Pastille } from '../../components/Pastille';
 import { quand } from '../../lib/dates';
 import { lireHistorique, lireSeuilLocal, type EntreeHistorique } from '../../lib/stockage-local';
+import { idOption, optionsDe, PanneauLigne, Suggestions, type Option } from './Suggestions';
+import { useRecherche } from './useRecherche';
 
-/** L'accueil de la maquette : Dicter (lot 4), Écrire, Mon seuil, Derniers produits, le principe, le pied « Photographier ». */
+/** L'accueil de la maquette : Dicter (lot 4), Écrire (nom, marque ou code-barres : lot 2), Mon seuil, Derniers produits, le principe, le pied « Photographier ». */
 export function AccueilPage() {
   const navigate = useNavigate();
   const [ouvert, setOuvert] = useState(true);
   const [saisie, setSaisie] = useState('');
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [actif, setActif] = useState(-1);
+  const [ferme, setFerme] = useState(false);
+  const [panneau, setPanneau] = useState<LigneTrouvee | null>(null);
   const [historique, setHistorique] = useState<EntreeHistorique[]>([]);
   const [seuil, setSeuil] = useState(2 as ReturnType<typeof lireSeuilLocal>);
   const champ = useRef<HTMLInputElement>(null);
@@ -25,14 +30,56 @@ export function AccueilPage() {
     setSeuil(lireSeuilLocal());
   }, []);
 
-  const chercher = (e: FormEvent) => {
-    e.preventDefault();
-    const ean = saisie.replace(/\s/g, '');
-    if (!/^\d{8,14}$/.test(ean)) {
-      setErreur('En v1, la recherche se fait par le code-barres (8 à 14 chiffres). La recherche par nom arrive au lot 2.');
+  // 13 chiffres tapés → la fiche, sans appel ; sinon les suggestions dès 3 caractères (anti-rebond, annulation : `useRecherche`).
+  const surCodeBarres = useCallback((ean: string) => navigate(`/produit/${ean}`), [navigate]);
+  const { etat, reessayer } = useRecherche(saisie, surCodeBarres);
+  const options = ferme ? [] : optionsDe(etat);
+  const listeOuverte = options.length > 0;
+
+  const choisir = (o: Option) => {
+    if (o.type === 'produit') {
+      navigate(`/produit/${o.produit.ean}`);
       return;
     }
-    navigate(`/produit/${ean}`);
+    setPanneau(o.ligne);
+    setFerme(true);
+    setActif(-1);
+  };
+
+  const chercher = (e: FormEvent) => {
+    e.preventDefault();
+    if (listeOuverte && actif >= 0 && options[actif]) {
+      choisir(options[actif]);
+      return;
+    }
+    // Entrée sur un code-barres plus court que 13 chiffres (EAN-8, 12, 14) : la fiche quand même.
+    const ean = saisie.replace(/\s/g, '');
+    if (/^\d{8,14}$/.test(ean)) navigate(`/produit/${ean}`);
+  };
+
+  const clavier = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      if (listeOuverte) {
+        e.preventDefault();
+        setFerme(true);
+        setActif(-1);
+      }
+      return;
+    }
+    if (!listeOuverte) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActif((i) => (i + 1) % options.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActif((i) => (i <= 0 ? options.length - 1 : i - 1));
+    } else if (e.key === 'Home' && listeOuverte) {
+      e.preventDefault();
+      setActif(0);
+    } else if (e.key === 'End' && listeOuverte) {
+      e.preventDefault();
+      setActif(options.length - 1);
+    }
   };
 
   return (
@@ -80,32 +127,37 @@ export function AccueilPage() {
 
       <form id="recherche" role="search" hidden={!ouvert} className="flex flex-col gap-[6px]" onSubmit={chercher}>
         <label className="cache-visuel" htmlFor="champ-produit">
-          Code-barres du produit
+          Nom du produit, marque ou code-barres
         </label>
         <input
           ref={champ}
           id="champ-produit"
           className="champ"
           type="search"
-          inputMode="numeric"
-          placeholder="Code-barres (13 chiffres)…"
+          placeholder="Nom du produit, marque ou code-barres…"
           autoComplete="off"
           aria-describedby="aide-produit"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={listeOuverte}
+          aria-controls="suggestions"
+          aria-activedescendant={listeOuverte && actif >= 0 ? idOption(actif) : undefined}
           value={saisie}
           onChange={(e) => {
             setSaisie(e.target.value);
-            setErreur(null);
+            setFerme(false);
+            setActif(-1);
+            setPanneau(null);
           }}
+          onKeyDown={clavier}
         />
         <p className="muet" id="aide-produit">
-          Tapez les chiffres sous les barres. La recherche par nom ou marque arrive au lot 2.
+          Suggestions dès 3 caractères ; un code-barres de 13 chiffres ouvre la fiche.
         </p>
-        {erreur ? (
-          <Bandeau ton="warn" role="alert">
-            {erreur}
-          </Bandeau>
-        ) : null}
+        {ferme ? null : <Suggestions etat={etat} options={options} actif={actif} surChoix={choisir} surSurvol={setActif} reessayer={reessayer} />}
       </form>
+
+      {panneau ? <PanneauLigne ligne={panneau} surFermeture={() => { setPanneau(null); champ.current?.focus(); }} /> : null}
 
       <Carte aria-labelledby="titre-seuil">
         <EnteteCarte

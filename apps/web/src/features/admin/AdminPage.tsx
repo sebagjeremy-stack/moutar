@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import type { Additif, Produit, StatutAdditif, Ton } from '@moutar/shared-types';
 import { Bandeau } from '../../components/Bandeau';
 import { Bouton } from '../../components/Bouton';
@@ -7,6 +7,8 @@ import { Champ } from '../../components/Champ';
 import { Pastille } from '../../components/Pastille';
 import { appel, envoyer, lire } from '../../lib/api';
 import { formaterJour } from '../../lib/dates';
+import { EtatNonLu, useLecture } from './lecture';
+import { ListeDetail, Listes } from './Listes';
 
 interface Session {
   email: string;
@@ -25,12 +27,18 @@ interface LigneJournal {
   email: string | null;
 }
 
-type Onglet = 'additifs' | 'produits' | 'journal';
+type Onglet = 'additifs' | 'produits' | 'journal' | 'listes';
+
+/** L'onglet se lit dans l'adresse (`/admin`, `/admin/produits`, `/admin/journal`, `/admin/listes`) : un lien y mène. */
+function ongletDepuisChemin(chemin: string): Onglet {
+  const reste = chemin.replace(/^\/admin\/?/, '').split('/')[0];
+  return reste === 'produits' || reste === 'journal' || reste === 'listes' ? reste : 'additifs';
+}
 
 const LIBELLE_STATUT: Record<StatutAdditif, string> = { casher: 'Casher', douteux: 'Douteux', non_casher: 'Non casher', inconnu: 'Inconnu' };
 const TON_STATUT: Record<StatutAdditif, Ton> = { casher: 'ok', douteux: 'warn', non_casher: 'danger', inconnu: 'neutre' };
 
-/** /admin — connexion (e-mail + mot de passe), puis un tableau de bord sobre : Additifs, Produits, Journal. */
+/** /admin — connexion (e-mail + mot de passe), puis un tableau de bord sobre : Additifs, Produits, Listes, Journal. */
 export function AdminPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
@@ -112,11 +120,12 @@ function Connexion({ surConnecte }: { surConnecte: () => Promise<void> }) {
 }
 
 function TableauDeBord({ session, surDeconnecte }: { session: Session; surDeconnecte: () => void }) {
-  const [onglet, setOnglet] = useState<Onglet>('additifs');
-  const onglets: Array<[Onglet, string]> = [
-    ['additifs', 'Additifs'],
-    ['produits', 'Produits'],
-    ['journal', 'Journal'],
+  const onglet = ongletDepuisChemin(useLocation().pathname);
+  const onglets: Array<[Onglet, string, string]> = [
+    ['additifs', 'Additifs', '/admin'],
+    ['produits', 'Produits', '/admin/produits'],
+    ['listes', 'Listes', '/admin/listes'],
+    ['journal', 'Journal', '/admin/journal'],
   ];
   const surRefus = useCallback(
     (statut: number) => {
@@ -141,52 +150,18 @@ function TableauDeBord({ session, surDeconnecte }: { session: Session; surDeconn
         </>
       }
     >
-      <nav aria-label="Sections" className="flex gap-2">
-        {onglets.map(([cle, libelle]) => (
-          <button key={cle} type="button" className={`btn min-h-[40px] ${onglet === cle ? 'border-primary bg-primary-soft text-primary-strong' : ''}`} aria-current={onglet === cle ? 'page' : undefined} onClick={() => setOnglet(cle)}>
+      <nav aria-label="Sections" className="flex flex-wrap gap-2">
+        {onglets.map(([cle, libelle, chemin]) => (
+          <Link key={cle} to={chemin} className={`btn min-h-[40px] ${onglet === cle ? 'border-primary bg-primary-soft text-primary-strong' : ''}`} aria-current={onglet === cle ? 'page' : undefined}>
             {libelle}
-          </button>
+          </Link>
         ))}
       </nav>
-      {onglet === 'additifs' ? <Additifs surRefus={surRefus} /> : onglet === 'produits' ? <Produits surRefus={surRefus} /> : <Journal surRefus={surRefus} />}
+      <Routes>
+        <Route path="listes/:id" element={<ListeDetail surRefus={surRefus} />} />
+        <Route path="*" element={onglet === 'additifs' ? <Additifs surRefus={surRefus} /> : onglet === 'produits' ? <Produits surRefus={surRefus} /> : onglet === 'listes' ? <Listes surRefus={surRefus} /> : <Journal surRefus={surRefus} />} />
+      </Routes>
     </Coquille>
-  );
-}
-
-type Chargement<T> = { phase: 'chargement' } | { phase: 'ok'; data: T } | { phase: 'echec'; message: string };
-
-function useLecture<T>(url: string, surRefus: (statut: number) => void) {
-  const [etat, setEtat] = useState<Chargement<T>>({ phase: 'chargement' });
-  const charger = useCallback(async () => {
-    setEtat({ phase: 'chargement' });
-    const r = await lire<T>(url);
-    if (r.ok) setEtat({ phase: 'ok', data: r.data });
-    else {
-      surRefus(r.statut);
-      setEtat({ phase: 'echec', message: r.message });
-    }
-  }, [url, surRefus]);
-  useEffect(() => {
-    void charger();
-  }, [charger]);
-  return { etat, charger, setEtat };
-}
-
-function EtatNonLu({ etat, recharger }: { etat: { phase: 'chargement' } | { phase: 'echec'; message: string }; recharger: () => void }) {
-  if (etat.phase === 'chargement')
-    return (
-      <p className="muet" role="status">
-        Lecture…
-      </p>
-    );
-  return (
-    <Bandeau ton="warn" role="alert" className="flex flex-wrap items-center gap-3">
-      <Pastille ton="warn">Non lu</Pastille>
-      <span className="flex-1">{etat.message}</span>
-      <Bouton className="min-h-[40px]" onClick={recharger}>
-        Réessayer
-      </Bouton>
-    </Bandeau>
   );
 }
 

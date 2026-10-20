@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { CarteProduit, LigneCarte, Produit, Ton } from '@moutar/shared-types';
+import type { CarteProduit, LigneCarte, Produit, SousLigneListe, Ton } from '@moutar/shared-types';
 import { libelleNiveau } from '@moutar/shared-types/regles/niveaux';
 import { Bandeau } from '../../components/Bandeau';
 import { Bouton, BoutonLien } from '../../components/Bouton';
@@ -15,6 +15,7 @@ import { envoyer, lire } from '../../lib/api';
 import { formaterEan, formaterJour } from '../../lib/dates';
 import { lireSeuilLocal, noterDansHistorique } from '../../lib/stockage-local';
 import { IngredientsEnGras } from './IngredientsEnGras';
+import { datesSousLigne, pastilleSousLigne, precisionSousLigne, SANS_LISTE } from './sous-lignes-regles';
 
 /** La bordure de la synthèse, en toutes lettres pour Tailwind ; aucune pour « neutre ». */
 const CLASSE_SYNTHESE: Record<Ton, string> = { ok: 'synthese-ok', warn: 'synthese-warn', danger: 'synthese-danger', neutre: '' };
@@ -180,6 +181,9 @@ const A_VENIR: Record<number, string> = {
 
 function LigneNiveau({ ligne, ean, tagsIgnores }: { ligne: LigneCarte; ean: string | null; tagsIgnores: number }) {
   const aVenir = A_VENIR[ligne.niveau];
+  // Niveau 2 (lot 2) : une sous-ligne PAR liste officielle, chacune avec sa pastille, sa date et sa validité — la pastille
+  // et le détail du niveau ne se répètent pas (une information n'est écrite qu'une fois par vue).
+  const sousLignes = ligne.niveau === 2 ? ligne.sousLignes : undefined;
   return (
     <li className="py-3">
       <div className="flex items-start gap-[10px]">
@@ -187,12 +191,14 @@ function LigneNiveau({ ligne, ean, tagsIgnores }: { ligne: LigneCarte; ean: stri
         <PastilleNumero niveau={ligne.niveau} className="-mt-[2px]" />
         <div className="flex min-h-7 min-w-0 flex-1 flex-wrap items-center gap-x-[10px] gap-y-[6px]">
           <span className="flex-auto font-display text-17 font-bold">{libelleNiveau(ligne.niveau).split(' · ')[1]}</span>
-          <Pastille ton={ligne.ton} className="max-w-full">
-            {ligne.pastille}
-          </Pastille>
+          {sousLignes ? null : (
+            <Pastille ton={ligne.ton} className="max-w-full">
+              {ligne.pastille}
+            </Pastille>
+          )}
         </div>
       </div>
-      <p className="ml-[42px] mt-[6px]">{ligne.detail}</p>
+      {sousLignes ? <SousLignes sousLignes={sousLignes} /> : <p className="ml-[42px] mt-[6px]">{ligne.detail}</p>}
       {ligne.avertissement ? (
         <Bandeau ton="warn" className="ml-[42px] mt-2">
           {ligne.avertissement}
@@ -210,6 +216,46 @@ function LigneNiveau({ ligne, ean, tagsIgnores }: { ligne: LigneCarte; ean: stri
       ) : null}
       {aVenir ? <p className="muet ml-[42px] mt-[6px]">{aVenir}</p> : null}
     </li>
+  );
+}
+
+/** Les sources du niveau 2 : une par liste active (source, dates, pastille avec son mot, précision) ; aucune → une ligne ambre. */
+function SousLignes({ sousLignes }: { sousLignes: SousLigneListe[] }) {
+  if (sousLignes.length === 0) {
+    return (
+      <ul className="liste ml-[42px] mt-[6px]" role="list" aria-label="Sources du niveau 2">
+        <li className="py-2">
+          <div className="flex flex-wrap items-center gap-x-[10px] gap-y-[6px]">
+            <p className="min-w-0 flex-auto">Aucune liste officielle n’est importée pour l’instant.</p>
+            <Pastille ton={SANS_LISTE.ton} className="max-w-full">
+              {SANS_LISTE.mot}
+            </Pastille>
+          </div>
+        </li>
+      </ul>
+    );
+  }
+  return (
+    <ul className="liste ml-[42px] mt-[6px]" role="list" aria-label="Sources du niveau 2">
+      {sousLignes.map((s) => {
+        const pastille = pastilleSousLigne(s);
+        const precision = precisionSousLigne(s);
+        return (
+          <li key={s.listeId} className="py-2">
+            <div className="flex flex-wrap items-center gap-x-[10px] gap-y-[6px]">
+              <p className="min-w-0 flex-auto">
+                <span className="font-semibold">{s.source}</span>
+                <span className="muet block">{datesSousLigne(s)}</span>
+              </p>
+              <Pastille ton={pastille.ton} className="max-w-full">
+                {pastille.mot}
+              </Pastille>
+            </div>
+            {precision ? <p className="mt-1">{precision}</p> : null}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

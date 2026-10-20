@@ -1,13 +1,13 @@
 /**
  * L'appel à l'API : ne lève jamais sur une réponse HTTP. Un échec rend `{ ok: false, code, message, statut }` ; une panne
- * réseau rend `code: 'reseau'`. L'écran n'écrit jamais « aucun » sur un échec : il dit « non lu » et propose « Réessayer ».
+ * réseau rend `code: 'reseau'` (une requête annulée aussi : l'appelant lit son signal). Un corps `FormData` part en multipart, sans en-tête JSON. L'écran n'écrit jamais « aucun » sur un échec : il dit « non lu » et propose « Réessayer ».
  */
 export type Reponse<T> = { ok: true; data: T } | { ok: false; statut: number; code: string; message: string; extra: Record<string, unknown> };
 
 export async function appel<T>(url: string, init: RequestInit = {}): Promise<Reponse<T>> {
   let r: Response;
   try {
-    r = await fetch(url, { credentials: 'same-origin', ...init, headers: { Accept: 'application/json', ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(init.headers ?? {}) } });
+    r = await fetch(url, { credentials: 'same-origin', ...init, headers: { Accept: 'application/json', ...(typeof init.body === 'string' ? { 'Content-Type': 'application/json' } : {}), ...(init.headers ?? {}) } });
   } catch {
     return { ok: false, statut: 0, code: 'reseau', message: 'Pas de réseau : la demande n’est pas partie.', extra: {} };
   }

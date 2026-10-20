@@ -19,6 +19,18 @@ export function quand(iso: string, maintenant: Date = new Date()): string {
   return JOUR.format(d);
 }
 
+/** « 01/07/2026 » depuis un JOUR `AAAA-MM-JJ` (une date de liste) : aucun fuseau n'entre en jeu, le jour s'écrit tel quel. */
+export function formaterJourCivil(jour: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(jour ?? '');
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : formaterJour(jour);
+}
+
+/** Le jour d'aujourd'hui sur ce téléphone, `AAAA-MM-JJ` (jamais `toISOString().slice(0, 10)` : le jour à Greenwich). */
+export function jourLocal(maintenant: Date = new Date()): string {
+  const deux = (n: number) => String(n).padStart(2, '0');
+  return `${maintenant.getFullYear()}-${deux(maintenant.getMonth() + 1)}-${deux(maintenant.getDate())}`;
+}
+
 /** « 3 000 000 000 000 » : l'EAN par groupes de trois, lisible. */
 export function formaterEan(ean: string | null): string {
   if (!ean) return '';
