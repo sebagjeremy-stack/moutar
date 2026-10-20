@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { statutAdditifEnum } from '../../database/schema';
@@ -16,6 +16,11 @@ const schemaSurcharge = z.object({
   note: z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), z.string().trim().max(1000).nullable().optional()),
 });
 const schemaCode = z.string().regex(/^E\d{3,4}[a-z]?$/, 'code E attendu');
+const schemaSurchargeCertificateur = z.object({
+  actif: z.boolean(),
+  note: z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), z.string().trim().max(1000).nullable().optional()),
+});
+const schemaCodeCertificateur = z.string().regex(/^[a-z_]{2,50}$/, 'code de certificateur attendu');
 
 /** La connexion, seule route de la console sans garde. */
 @Controller('admin')
@@ -62,6 +67,25 @@ export class AdminController {
   surcharger(@Param('code') code: string, @Body() corps: unknown, @Req() req: RequeteAdmin) {
     const v = schemaSurcharge.parse(corps);
     return this.admin.surchargerAdditif(schemaCode.parse(code), { statut: v.statut, source: v.source, note: v.note ?? null }, req.admin!);
+  }
+
+  /** Lot 3 : le catalogue des certificateurs et ses surcharges (actif, note). */
+  @Get('certificateurs')
+  certificateurs() {
+    return this.admin.certificateurs();
+  }
+
+  @Get('certificateurs/:code')
+  async certificateur(@Param('code') code: string) {
+    const c = (await this.admin.certificateurs()).find((x) => x.code === schemaCodeCertificateur.parse(code));
+    if (!c) throw new NotFoundException({ code: 'certificateur_inconnu', message: 'Certificateur inconnu du catalogue.' });
+    return c;
+  }
+
+  @Put('certificateurs/:code')
+  surchargerCertificateur(@Param('code') code: string, @Body() corps: unknown, @Req() req: RequeteAdmin) {
+    const v = schemaSurchargeCertificateur.parse(corps ?? {});
+    return this.admin.surchargerCertificateur(schemaCodeCertificateur.parse(code), { actif: v.actif, note: v.note ?? null }, req.admin!);
   }
 
   @Get('produits')

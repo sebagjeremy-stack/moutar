@@ -14,8 +14,10 @@ Socle posé au lot 1 (20/10/2026). Un seul compte, celui du médecin-utilisateur
 - **Pages** : Additifs (catalogue en code fusionné aux surcharges ; statut, source obligatoire, note ; filtre), Produits (50 derniers lus), Journal (200 dernières lignes). Mêmes jetons que l'application, largeur 1100 px tolérée.
 - **Listes officielles (lot 2, 20/10/2026)** : routes `/admin/listes` (aperçu sans écriture, import en une transaction qui désactive l'ancienne édition du même code, dates et activation, lignes corrigées une à une, ajout manuel, retrait doux), toutes sous `AdminGuard` ; actions du journal `liste.import`, `liste.modification`, `ligne.ajout`, `ligne.modification`, `ligne.suppression`. Le journal s'écrit par UNE voie, `journaliserSur(db | tx, …)`, dans la transaction quand il y en a une. Contrat et décisions : `lot-2-listes-officielles.md`.
 
+- **Certificateurs (lot 3, 20/10/2026)** : `GET /admin/certificateurs[/:code]` (le catalogue EN CODE fusionné à `certificateur_surcharge`), `PUT /admin/certificateurs/:code` `{ actif, note? }` (journal `certificateur.surcharge`, dans la transaction). Un certificateur désactivé n'est plus proposé à la lecture d'un logo, ne fonde plus une validation, et une certification déjà validée avec lui redevient « Non vérifié » sur la carte. Le journal `journal_ia` (appels au moteur d'IA, sans contenu) est en ajout seul comme `journal_admin` ; sa lecture à la console viendra avec l'écran. Contrat et décisions : `lot-3-ia-logo-ocr.md`.
+
 ## Reste
 - **BLOQUANT avant mise en ligne : un rôle applicatif PostgreSQL distinct, non superutilisateur, sans droit UPDATE/DELETE/TRUNCATE sur les journaux** (l'API s'y connecte ; les migrations gardent le propriétaire). Tant qu'il n'existe pas, l'ajout seul du journal ne tient que par les déclencheurs.
 - Changer son mot de passe depuis la console ; plusieurs comptes (modérateurs du lot 5).
-- Désactivation d'un certificateur (`certificateur_surcharge`, lot 3) ; validation des contributions (lot 5).
+- Validation des contributions (lot 5) ; lecture de `journal_ia` (consommation du moteur d'IA) à la console.
 - Limite de débit en mémoire : suffisante pour une instance ; à revoir si plusieurs.

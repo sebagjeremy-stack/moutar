@@ -116,3 +116,22 @@ describe('calculerSynthese (seuil × lignes)', () => {
     expect(s.pastille).toBe('Non vérifié · additif douteux');
   });
 });
+
+describe('synthèse : une marque citée sous une autre rubrique (lot 3, correction du lot 2)', () => {
+  it('ne fonde pas un « permis » : « Non vérifié · à vérifier », fondé sur la liste, la mention dans la phrase', () => {
+    const s = calculerSynthese(
+      [
+        { niveau: 1, statut: 'non_verifie', source: null, mention: null, composition: null },
+        { niveau: 2, statut: 'non_verifie', source: 'Consistoire de Paris — Produits 2025-2026', mention: 'rubrique « BISCUITS SECS » : à vérifier', composition: null, valableJusquAu: '2027-07-31' },
+        { niveau: 4, statut: 'non_verifie', source: null, mention: null, composition: null },
+      ],
+      2,
+      '2026-10-20',
+    );
+    expect(s.verdict).toBe('non_verifie');
+    expect(s.pastille).toBe('Non vérifié · à vérifier');
+    expect(s.source).toContain('Consistoire');
+    expect(s.phrase).toContain('sous une autre rubrique');
+    expect(s.proposerScanIngredients).toBe(true);
+  });
+});

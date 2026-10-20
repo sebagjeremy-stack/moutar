@@ -25,9 +25,13 @@ export class FiltreErreurs implements ExceptionFilter {
       const statut = exception.getStatus();
       const corps = exception.getResponse();
       const detail = typeof corps === 'object' && corps !== null ? (corps as Record<string, unknown>) : { message: String(corps) };
-      const code = typeof detail['code'] === 'string' ? detail['code'] : codeParDefaut(statut);
+      if (typeof detail['code'] !== 'string') {
+        // Une exception de Nest lui-même (garde, multer « File too large »…) : un corps propre, en français, sans son message anglais.
+        res.status(statut).json({ code: codeParDefaut(statut), message: messageParDefaut(statut) });
+        return;
+      }
       const message = typeof detail['message'] === 'string' ? detail['message'] : messageParDefaut(statut);
-      res.status(statut).json({ ...detail, code, message });
+      res.status(statut).json({ ...detail, code: detail['code'], message });
       return;
     }
     this.logger.error(exception instanceof Error ? exception.stack ?? exception.message : String(exception));
@@ -68,7 +72,7 @@ function messageParDefaut(statut: number): string {
   if (statut === 401) return 'Connexion requise.';
   if (statut === 403) return 'Accès refusé : cette session ne permet pas ce geste.';
   if (statut === 404) return 'Introuvable.';
-  if (statut === 413) return 'Le fichier envoyé est trop grand (10 Mo au plus).';
+  if (statut === 413) return 'Le fichier envoyé est trop grand (8 Mo au plus pour une photo, 10 Mo pour un fichier de liste).';
   if (statut === 429) return 'Trop de demandes : patientez un instant, puis réessayez.';
   return 'Erreur.';
 }

@@ -21,8 +21,11 @@ export type StatutComposition = 'aucun_additif_problematique' | 'douteux' | 'non
 /** Le ton d'une pastille : le mot s'écrit TOUJOURS à côté ; le rouge est réservé à « non cacher ». */
 export type Ton = 'ok' | 'warn' | 'danger' | 'neutre';
 
-/** Origine d'une fiche produit. */
+/** Origine d'une fiche produit ; `ocr` : des ingrédients lus sur une photo, relus et validés par l'utilisateur (lot 3). */
 export type SourceProduit = 'off' | 'manuel' | 'ocr';
+
+/** Origine d'une saisie d'ingrédients (`PUT /produits/:ean/ingredients`) : collés à la main, ou lus par OCR puis relus. */
+export type SourceIngredients = 'manuel' | 'ocr';
 
 export interface Additif {
   code: string;
@@ -34,11 +37,82 @@ export interface Additif {
   source: string;
 }
 
+/**
+ * Les mentions qu'un logo de certification peut porter (lot 3) : elles qualifient la certification, elles ne la remplacent
+ * pas. Codes stables ; libellés humains dans `catalogues/certificateurs.ts` (`libelleMentionCertification`).
+ */
+export type MentionCertification = 'parve' | 'halavi' | 'lait_non_surveille' | 'pessah' | 'mehadrin';
+
+/** Un certificateur du catalogue EN CODE (dix en v1, cadrage § 8.3) ; la console peut en désactiver un (`certificateur_surcharge`). */
 export interface Certificateur {
   code: string;
   nom: string;
+  /** Le nom de la pastille (« Certifié · OU »). */
+  nomCourt: string;
   pays: string;
+  /** Les textes lisibles sur le logo, en mots entiers (« OU », « Orthodox Union », « KBDP », « Beth Din de Paris »…). */
+  motsCles: string[];
+  mentionsPossibles: MentionCertification[];
+  /** Description courte de la forme du logo, en français (sert à la correspondance : « OU » exige le cercle). */
+  formeDuLogo: string;
+}
+
+/* ---------- Lot 3 : lecture d'un logo, certification de niveau 1, OCR ---------- */
+
+/** Ce que le modèle de vision a lu : des CANDIDATS, jamais un verdict (c'est le code qui fait la correspondance). */
+export interface LectureLogo {
+  candidats: Array<{ texteLu: string; forme: string; confiance: number }>;
+  /** Les mentions lues près des symboles, telles quelles (« PARVE », « D », « pessah »…). */
   mentions: string[];
+  autresTextes: string[];
+}
+
+/** Une PROPOSITION de certificateur, à valider d'un clic par l'utilisateur ; rien n'est écrit tant qu'il ne l'a pas fait. */
+export interface PropositionCertificateur {
+  code: string;
+  nom: string;
+  nomCourt: string;
+  /** 0 à 1 : la confiance du modèle pondérée par la force du mot-clé reconnu. */
+  confiance: number;
+  texteLu: string;
+  mentions: MentionCertification[];
+}
+
+/** La réponse de `POST /produits/:ean/logo` et `POST /logos/lire`. */
+export interface ResultatLectureLogo {
+  propositions: PropositionCertificateur[];
+  /** Vrai quand aucun certificateur du catalogue n'a été reconnu (ce n'est PAS un « non cacher »). */
+  aucun: boolean;
+  /** Les symboles lus par le modèle qui ne correspondent à aucun certificateur du catalogue (l'utilisateur peut les signaler). */
+  candidatsNonReconnus: string[];
+  autresTextes: string[];
+}
+
+/** La certification de niveau 1 d'un produit, VALIDÉE par l'utilisateur (verdict `cite`, source = le certificateur). */
+export interface CertificationProduit {
+  verdictId: string;
+  code: string;
+  nom: string;
+  nomCourt: string;
+  mentions: MentionCertification[];
+  /** Les libellés humains des mentions (« parvé », « halavi »), dans le même ordre. */
+  mentionsLibelles: string[];
+  texteLu: string | null;
+  /** Instant de la validation (ISO). */
+  publieLe: string;
+  /** Faux quand la console a désactivé ce certificateur depuis : la carte ne dit plus « certifié ». */
+  certificateurActif: boolean;
+}
+
+/** La transcription d'une liste d'ingrédients par OCR : rendue SANS être enregistrée (l'utilisateur relit, puis `PUT …/ingredients`). */
+export interface TranscriptionOcr {
+  /** Le texte lu, nettoyé par le code (« E 1 2 0 » → « E120 », césures, retours à la ligne). */
+  texte: string;
+  /** Le texte tel que le modèle l'a rendu, avant nettoyage (pour relire). */
+  texteBrut: string;
+  langue: string | null;
+  lisible: boolean;
+  confiance: number;
 }
 
 export interface Produit {

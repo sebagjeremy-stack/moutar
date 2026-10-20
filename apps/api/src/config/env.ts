@@ -20,9 +20,14 @@ const schemaEnv = z.object({
   /** Lot 3 : deux fournisseurs derrière un seul module `ia` (CLAUDE.md, 20/10/2026) ; OVH par défaut. */
   IA_FOURNISSEUR: z.enum(['ovh', 'anthropic']).default('ovh'),
   ANTHROPIC_API_KEY: videVautAbsente(z.string().min(1).optional()),
+  /** Le modèle Claude (SDK officiel) ; `claude-opus-5-5` par défaut (CLAUDE.md, 20/10/2026). */
+  IA_MODELE_ANTHROPIC: videVautAbsente(z.string().optional()).default('claude-opus-5-5'),
+  /** OVHcloud AI Endpoints (compatible OpenAI) : adresse `/v1`, jeton (absent quand un mandataire authentifie), modèles. */
   IA_BASE_URL: videVautAbsente(z.string().url().optional()),
-  IA_MODELE_VISION: videVautAbsente(z.string().optional()),
-  IA_MODELE_TEXTE: videVautAbsente(z.string().optional()),
+  IA_API_KEY: videVautAbsente(z.string().min(1).optional()),
+  IA_MODELE_VISION: videVautAbsente(z.string().optional()).default('Qwen2.5-VL-72B-Instruct'),
+  IA_MODELE_TEXTE: videVautAbsente(z.string().optional()).default('gpt-oss-120b'),
+  IA_MODELE_AUDIO: videVautAbsente(z.string().optional()).default('whisper-large-v3-turbo'),
   /** Hôtes EXACTS autorisés pour IA_BASE_URL, séparés par des virgules ; aucun sous-domaine implicite. */
   IA_HOTES_AUTORISES: videVautAbsente(z.string().optional()),
   OFF_BASE_URL: videVautAbsente(z.string().url().optional()).default('https://world.openfoodfacts.org'),

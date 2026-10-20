@@ -87,17 +87,22 @@ export function calculerSynthese(lignesBrutes: LigneSynthese[], seuil: Niveau, a
       proposerScanIngredients: false,
     };
   }
+  // Lot 3 (correction du lot 2) : une marque citée sous une rubrique ÉTRANGÈRE au produit ne fonde pas un « permis » ;
+  // la ligne arrive `non_verifie` avec sa mention (« rubrique « X » : à vérifier »), et la synthèse le dit.
+  const aVerifier = lues.find((l) => l.statut === 'non_verifie' && l.niveau !== 4 && l.mention);
   return {
     verdict: 'non_verifie',
     ton,
-    pastille: perimee ? 'Non vérifié · liste périmée' : 'Non vérifié',
-    source: perimee?.source ?? null,
-    niveauFondateur: perimee?.niveau ?? null,
+    pastille: perimee ? 'Non vérifié · liste périmée' : aVerifier ? 'Non vérifié · à vérifier' : 'Non vérifié',
+    source: perimee?.source ?? aVerifier?.source ?? null,
+    niveauFondateur: perimee?.niveau ?? aVerifier?.niveau ?? null,
     phrase: perimee
       ? `Cité seulement par une source périmée (${perimee.source ?? 'sans nom'}). Il reste la composition (niveau 4).`
-      : compositionLue
-        ? 'Aucun logo lu, aucune liste ne cite ce produit. La composition (niveau 4) a été lue : voir ci-dessous.'
-        : 'Aucun logo lu, aucune liste ne cite ce produit. Il reste la composition (niveau 4).',
+      : aVerifier
+        ? `Cité par ${aVerifier.source ?? 'une liste'} sous une autre rubrique (${aVerifier.mention}) : vérifiez que ce produit en relève. Il reste la composition (niveau 4).`
+        : compositionLue
+          ? 'Aucun logo lu, aucune liste ne cite ce produit. La composition (niveau 4) a été lue : voir ci-dessous.'
+          : 'Aucun logo lu, aucune liste ne cite ce produit. Il reste la composition (niveau 4).',
     proposerScanIngredients: compositionLue === null,
   };
 }

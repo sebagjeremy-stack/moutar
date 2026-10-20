@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, isNull } from 'drizzle-orm';
-import type { Produit } from '@moutar/shared-types';
+import type { Produit, SourceIngredients } from '@moutar/shared-types';
 import { ErreurMetier } from '../../common/erreurs/erreur-metier';
 import { loadEnv } from '../../config/env';
 import type { Database } from '../../database/client';
@@ -90,13 +90,17 @@ export class ProduitsService {
     return versProduit(l);
   }
 
-  /** Les ingrédients saisis par l'utilisateur (lot 1 : texte collé ; lot 3 : OCR relu). */
-  async mettreAJourIngredients(ean: string, ingredientsTexte: string): Promise<Produit> {
+  /**
+   * Les ingrédients saisis par l'utilisateur (lot 1 : texte collé ; lot 3 : OCR relu et validé, `source: 'ocr'`). Une
+   * fiche dont les ingrédients viennent de l'OCR passe `source: 'ocr'` : la relecture silencieuse d'Open Food Facts
+   * (30 jours) ne les écrase plus.
+   */
+  async mettreAJourIngredients(ean: string, ingredientsTexte: string, source: SourceIngredients = 'manuel'): Promise<Produit> {
     const existante = await this.trouverParEan(ean);
     if (!existante) throw new ErreurMetier(404, 'produit_inconnu', 'Produit inconnu : créez-le d’abord.', { ean });
     const [l] = await this.db
       .update(produit)
-      .set({ ingredientsTexte, additifs: extraireCodesE(ingredientsTexte), updatedAt: new Date() })
+      .set({ ingredientsTexte, additifs: extraireCodesE(ingredientsTexte), ...(source === 'ocr' ? { source: 'ocr' as const } : {}), updatedAt: new Date() })
       .where(eq(produit.id, existante.id))
       .returning();
     return versProduit(l);

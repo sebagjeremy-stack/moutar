@@ -1,12 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
-import type { Additif, StatutAdditif } from '@moutar/shared-types';
+import type { Additif, Certificateur, StatutAdditif } from '@moutar/shared-types';
 import { ADDITIFS } from '@moutar/shared-types/catalogues/additifs';
+import { CERTIFICATEURS } from '@moutar/shared-types/catalogues/certificateurs';
 import { ErreurMetier } from '../../common/erreurs/erreur-metier';
 import { LimiteDeDebit } from '../../common/auth/limite-de-debit';
 import type { Database } from '../../database/client';
 import { DRIZZLE } from '../../database/database.module';
-import { additifSurcharge, compteAdmin, journalAdmin, sessionAdmin } from '../../database/schema';
+import { additifSurcharge, certificateurSurcharge, compteAdmin, journalAdmin, sessionAdmin } from '../../database/schema';
 import { HASH_LEURRE, verifierMotDePasse } from './mot-de-passe';
 import { DUREE_SESSION_MS, genererJeton, hacherJeton } from './session-admin';
 
@@ -22,6 +23,13 @@ export interface AdditifConsole extends Additif {
   surcharge: { statut: StatutAdditif; source: string; note: string | null; updatedAt: string } | null;
   /** Le statut effectif (surcharge, sinon catalogue). */
   statutEffectif: StatutAdditif;
+}
+
+/** Une ligne de la console des certificateurs (lot 3) : le catalogue EN CODE, et sa surcharge (actif, note) s'il y en a une. */
+export interface CertificateurConsole extends Certificateur {
+  actif: boolean;
+  note: string | null;
+  surcharge: { actif: boolean; note: string | null } | null;
 }
 
 const FENETRE_MS = 15 * 60 * 1000;
@@ -122,6 +130,28 @@ export class AdminService {
     const ligne = (await this.additifs()).find((a) => a.code === code);
     if (!ligne) throw new ErreurMetier(404, 'introuvable', 'Additif introuvable.');
     return ligne;
+  }
+
+  /** Les certificateurs du catalogue, fusionnés à leur surcharge de console (désactivation, note). */
+  async certificateurs(): Promise<CertificateurConsole[]> {
+    const surcharges = new Map((await this.db.select().from(certificateurSurcharge)).map((s) => [s.code, s]));
+    return CERTIFICATEURS.map((c) => {
+      const s = surcharges.get(c.code);
+      return { ...c, actif: s?.actif ?? true, note: s?.note ?? null, surcharge: s ? { actif: s.actif, note: s.note } : null };
+    });
+  }
+
+  /** Active ou désactive un certificateur du catalogue, avec une note ; journalisé (`certificateur.surcharge`). 404 hors catalogue. */
+  async surchargerCertificateur(code: string, valeurs: { actif: boolean; note: string | null }, session: SessionLue): Promise<CertificateurConsole> {
+    if (!CERTIFICATEURS.some((c) => c.code === code)) throw new ErreurMetier(404, 'certificateur_inconnu', 'Certificateur inconnu du catalogue.', { certificateur: code });
+    await this.db.transaction(async (tx) => {
+      await tx
+        .insert(certificateurSurcharge)
+        .values({ code, actif: valeurs.actif, note: valeurs.note })
+        .onConflictDoUpdate({ target: certificateurSurcharge.code, set: { actif: valeurs.actif, note: valeurs.note } });
+      await journaliserSur(tx, session.compteId, 'certificateur.surcharge', code, { actif: valeurs.actif, note: valeurs.note });
+    });
+    return (await this.certificateurs()).find((c) => c.code === code)!;
   }
 
   /** Le journal, lecture seule, les 200 dernières lignes. */

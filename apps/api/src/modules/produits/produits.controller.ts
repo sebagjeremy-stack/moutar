@@ -13,7 +13,8 @@ const schemaCreation = z.object({
   marque: z.preprocess(videVersNull, z.string().trim().max(200).nullable().optional()),
   ingredientsTexte: z.preprocess(videVersNull, z.string().trim().max(5000).nullable().optional()),
 });
-const schemaIngredients = z.object({ ingredientsTexte: z.string().trim().min(1).max(5000) });
+/** Lot 3 : `source: 'ocr'` quand le texte vient d'une photo relue par l'utilisateur (la fiche passe `source: 'ocr'`). */
+const schemaIngredients = z.object({ ingredientsTexte: z.string().trim().min(1).max(5000), source: z.enum(['manuel', 'ocr']).default('manuel') });
 
 @Controller('produits')
 export class ProduitsController {
@@ -32,6 +33,7 @@ export class ProduitsController {
 
   @Put(':ean/ingredients')
   ingredients(@Param('ean') ean: string, @Body() corps: unknown): Promise<Produit> {
-    return this.produits.mettreAJourIngredients(schemaEan.parse(ean), schemaIngredients.parse(corps).ingredientsTexte);
+    const c = schemaIngredients.parse(corps);
+    return this.produits.mettreAJourIngredients(schemaEan.parse(ean), c.ingredientsTexte, c.source);
   }
 }

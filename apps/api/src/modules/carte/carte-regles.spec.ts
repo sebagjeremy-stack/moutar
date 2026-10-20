@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Produit, SousLigneListe } from '@moutar/shared-types';
+import type { CertificationProduit, Produit, SousLigneListe } from '@moutar/shared-types';
 import { analyserComposition } from '../analyse/analyse-composition-regles';
-import { calculerSynthese, ligneCertifie, ligneComposition, ligneListeOfficielle, lignesSyntheseNiveau2 } from './carte-regles';
+import { calculerSynthese, ligneCertifie, ligneComposition, ligneListeOfficielle, ligneSyntheseNiveau1, lignesSyntheseNiveau2 } from './carte-regles';
 
 const p: Produit = { id: 'x', ean: '1', nom: 'Test', marque: null, imageUrl: null, ingredientsTexte: null, additifs: [], source: 'off', luLe: '2026-10-20T10:00:00Z' };
 
@@ -102,10 +102,63 @@ describe('ligne du niveau 2 (lot 2)', () => {
   });
 });
 
-describe('mention du niveau 2 quand la confiance est faible', () => {
-  it('une marque citée sous une rubrique étrangère au produit porte « à vérifier » dans la mention', () => {
+describe('marque citée sous une autre rubrique (confiance faible) — lot 3, correction du lot 2', () => {
+  it('ne fonde plus un « permis » : ambre « Cité dans une autre rubrique · à vérifier », synthèse « Non vérifié »', () => {
     const l = ligneListeOfficielle([sous({ statut: 'cite', confiance: 'faible', mention: 'lait non surveillé', ligne: { id: 'l1', rubrique: 'BISCUITS SECS', marque: 'Lu', produitLibelle: null } })]);
+    expect(l).toMatchObject({ statut: 'non_verifie', ton: 'warn', pastille: 'Cité dans une autre rubrique · à vérifier' });
+    expect(l.source).toContain('Consistoire');
     expect(l.mention).toBe('lait non surveillé · rubrique « BISCUITS SECS » : à vérifier');
-    expect(calculerSynthese(lignesSyntheseNiveau2(l), 2, '2026-10-20').pastille).toBe('Permis · lait non surveillé · rubrique « BISCUITS SECS » : à vérifier');
+    expect(lignesSyntheseNiveau2(l)[0]).toMatchObject({ statut: 'non_verifie', mention: 'lait non surveillé · rubrique « BISCUITS SECS » : à vérifier' });
+    const s = calculerSynthese(lignesSyntheseNiveau2(l), 2, '2026-10-20');
+    expect(s.verdict).toBe('non_verifie');
+    expect(s.pastille).toBe('Non vérifié · à vérifier');
+    expect(s.phrase).toContain('sous une autre rubrique');
+  });
+  it('une citation forte par une autre liste l’emporte ; une citation par rubrique aussi (vert)', () => {
+    const faible = sous({ statut: 'cite', confiance: 'faible', ligne: { id: 'l1', rubrique: 'BISCUITS SECS', marque: 'Lu', produitLibelle: null } });
+    const rubrique = sous({ listeId: 'w', code: 'rav_wolff', source: 'Rav Wolff 2026', statut: 'cite_par_rubrique', confiance: 'faible', ligne: { id: 'x', rubrique: 'Pâtes à tartiner', marque: null, produitLibelle: null } });
+    expect(ligneListeOfficielle([faible, rubrique]).pastille).toBe('Cité par rubrique · Rav Wolff');
+    expect(lignesSyntheseNiveau2(ligneListeOfficielle([faible, rubrique])).map((x) => x.statut)).toEqual(['non_verifie', 'cite']);
+  });
+  it('une citation faible passe devant une liste périmée et devant « non cité »', () => {
+    const faible = sous({ statut: 'cite', confiance: 'faible', ligne: { id: 'l1', rubrique: 'B', marque: 'Lu', produitLibelle: null } });
+    const perimee = sous({ listeId: 'w', code: 'rav_wolff', source: 'Rav Wolff 2026', statut: 'perime', confiance: 'forte', ligne: { id: 'x', rubrique: 'B', marque: 'Lu', produitLibelle: null } });
+    expect(ligneListeOfficielle([perimee, faible]).pastille).toBe('Cité dans une autre rubrique · à vérifier');
+  });
+});
+
+const certification: CertificationProduit = {
+  verdictId: 'v1',
+  code: 'ou',
+  nom: 'Orthodox Union (OU)',
+  nomCourt: 'OU',
+  mentions: ['parve'],
+  mentionsLibelles: ['parvé'],
+  texteLu: 'U',
+  publieLe: '2026-10-20T10:00:00.000Z',
+  certificateurActif: true,
+};
+
+describe('ligne du niveau 1 (lot 3)', () => {
+  it('sans certification validée : « Aucun logo lu », neutre, jamais « non »', () => {
+    const l = ligneCertifie(null);
+    expect(l).toMatchObject({ niveau: 1, statut: 'non_verifie', ton: 'neutre', pastille: 'Aucun logo lu', source: null });
+    expect(calculerSynthese([ligneSyntheseNiveau1(l, null)], 1, '2026-10-20').verdict).toBe('non_verifie');
+  });
+  it('certification validée : vert « Certifié · OU », mention, source, et la synthèse dit « Permis · OU · parvé »', () => {
+    const l = ligneCertifie(certification);
+    expect(l).toMatchObject({ statut: 'cite', ton: 'ok', pastille: 'Certifié · OU', mention: 'parvé', source: 'Orthodox Union (OU)', publieLe: certification.publieLe, valableJusquAu: null });
+    expect(l.detail).toContain('validé par vous le 20/10/2026');
+    expect(l.detail).toContain('texte lu : « U »');
+    const s = calculerSynthese([ligneSyntheseNiveau1(l, certification)], 1, '2026-10-20');
+    expect(s.verdict).toBe('permis');
+    expect(s.pastille).toBe('Permis · OU · parvé');
+    expect(s.source).toBe('Orthodox Union (OU)');
+  });
+  it('certificateur désactivé à la console depuis : ambre « Non vérifié », jamais vert', () => {
+    const l = ligneCertifie({ ...certification, certificateurActif: false, mentions: [], mentionsLibelles: [], texteLu: null });
+    expect(l).toMatchObject({ statut: 'non_verifie', ton: 'warn', pastille: 'Non vérifié', mention: null });
+    expect(l.detail).toContain('plus reconnu');
+    expect(calculerSynthese([ligneSyntheseNiveau1(l, { ...certification, certificateurActif: false })], 1, '2026-10-20').verdict).toBe('non_verifie');
   });
 });
