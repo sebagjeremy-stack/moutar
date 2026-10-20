@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import type { z } from 'zod';
 import { interpreterJson } from './extraction-json';
-import { ErreurIa, type AudioIa, type Consigne, type FournisseurIa, type ImageIa, type OptionsAppel, type ReponseIa } from './fournisseur-ia';
+import { ErreurIa, type AudioIa, type Consigne, type FournisseurIa, type ImageIa, type OptionsAppel, type ReponseIa, type TranscriptionIa } from './fournisseur-ia';
 
 /** Ce que le fournisseur lit du client Anthropic (un client simulé suffit aux tests). */
 export type ClientAnthropic = {
@@ -73,7 +73,7 @@ export class AnthropicFournisseur implements FournisseurIa {
     return { valeur: interpreterJson(texte, schema), modele: message.model ?? this.cfg.modele, jetonsEntree: message.usage?.input_tokens ?? null, jetonsSortie: message.usage?.output_tokens ?? null };
   }
 
-  async transcrire(_audio: AudioIa, _options: OptionsAppel): Promise<ReponseIa<string>> {
+  async transcrire(_audio: AudioIa, _options: OptionsAppel): Promise<ReponseIa<TranscriptionIa>> {
     throw new ErreurIa('non_supporte', 'La transcription audio n’existe pas chez ce fournisseur : réglez IA_FOURNISSEUR=ovh pour la dictée.');
   }
 }

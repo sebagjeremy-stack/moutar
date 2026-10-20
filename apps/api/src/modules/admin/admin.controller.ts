@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { statutAdditifEnum } from '../../database/schema';
@@ -21,6 +21,7 @@ const schemaSurchargeCertificateur = z.object({
   note: z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), z.string().trim().max(1000).nullable().optional()),
 });
 const schemaCodeCertificateur = z.string().regex(/^[a-z_]{2,50}$/, 'code de certificateur attendu');
+const schemaPage = z.coerce.number().int().min(1).max(100_000).default(1);
 
 /** La connexion, seule route de la console sans garde. */
 @Controller('admin')
@@ -97,6 +98,18 @@ export class AdminController {
   @Get('journal')
   journal() {
     return this.admin.journal();
+  }
+
+  /** Lot 5 : le journal du moteur d'IA, lecture seule, 50 par page (`?page=`), sans contenu. */
+  @Get('journal-ia')
+  journalIa(@Query('page') page?: string) {
+    return this.admin.journalIa(schemaPage.parse(page));
+  }
+
+  /** Lot 5 : le tableau de bord — des comptes, jamais une personne. */
+  @Get('tableau')
+  tableau() {
+    return this.admin.tableau();
   }
 
   /** Réservé : aucune suppression de journal n'existe (ajout seul) — la route répond 405 pour le dire. */

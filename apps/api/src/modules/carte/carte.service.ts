@@ -4,10 +4,11 @@ import type { LigneSynthese } from '@moutar/shared-types/regles/synthese';
 import { jourLocal } from '../../common/temps/jour-local';
 import { AnalyseService } from '../analyse/analyse.service';
 import { CertificationService } from '../certification/certification.service';
+import { ContributionsService } from '../contributions/contributions.service';
 import { correspondanceListes } from '../listes/correspondance-liste-regles';
 import { ListesService } from '../listes/listes.service';
 import { ProduitsService } from '../produits/produits.service';
-import { calculerSynthese, ligneCertifie, ligneCommunautaire, ligneComposition, ligneListeOfficielle, ligneSyntheseNiveau1, lignesSyntheseNiveau2 } from './carte-regles';
+import { calculerSynthese, ligneCertifie, ligneCommunautaire, ligneComposition, ligneListeOfficielle, ligneSyntheseNiveau1, ligneSyntheseNiveau3, lignesSyntheseNiveau2 } from './carte-regles';
 
 /** Un jour `AAAA-MM-JJ` reste tel quel ; un instant ISO devient le jour du centre. */
 function versJourLocal(valeur: string | null): string | null {
@@ -22,6 +23,7 @@ export class CarteService {
     private readonly analyse: AnalyseService,
     private readonly listes: ListesService,
     private readonly certification: CertificationService,
+    private readonly contributions: ContributionsService,
   ) {}
 
   /** La carte : les quatre niveaux et la synthèse selon le seuil. La composition s'analyse dès qu'elle est connue. */
@@ -35,16 +37,18 @@ export class CarteService {
     const niveau2 = ligneListeOfficielle(sousLignes);
     // Niveau 1 (lot 3) : la certification VALIDÉE par l'utilisateur, ou rien (jamais un « non »).
     const certification = await this.certification.lire(p.id);
+    // Niveau 3 (lot 5) : les contributions VALIDÉES à la console, et le nombre en attente (règle pure).
+    const communaute = await this.contributions.publiques(p.id);
     const lignes = [
       ligneCertifie(certification),
       niveau2,
-      ligneCommunautaire(),
+      ligneCommunautaire(communaute.contributions, communaute.enAttente),
       ligneComposition(p, resultat?.analyse ?? null, resultat ? new Date(resultat.verdict.publieLe ?? resultat.verdict.createdAt) : new Date()),
     ];
     // La synthèse compare la validité d'une source au jour du CENTRE (Europe/Paris), en jours locaux des deux côtés ;
     // le niveau 2 lui donne une ligne PAR liste (chacune avec sa validité).
     const pourSynthese: LigneSynthese[] = lignes.flatMap((l) =>
-      l.niveau === 1 ? [ligneSyntheseNiveau1(l, certification)] : l.niveau === 2 ? lignesSyntheseNiveau2(l) : [{ ...l, valableJusquAu: versJourLocal(l.valableJusquAu) }],
+      l.niveau === 1 ? [ligneSyntheseNiveau1(l, certification)] : l.niveau === 2 ? lignesSyntheseNiveau2(l) : l.niveau === 3 ? [ligneSyntheseNiveau3(l)] : [{ ...l, valableJusquAu: versJourLocal(l.valableJusquAu) }],
     );
     return { produit: p, seuil, lignes, synthese: calculerSynthese(pourSynthese, seuil, aujourdhui), analyse: resultat?.analyse ?? null };
   }

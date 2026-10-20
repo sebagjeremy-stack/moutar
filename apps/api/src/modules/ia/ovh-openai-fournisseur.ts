@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import type { z } from 'zod';
 import { interpreterJson } from './extraction-json';
-import { ErreurIa, type AudioIa, type Consigne, type FournisseurIa, type ImageIa, type OptionsAppel, type ReponseIa } from './fournisseur-ia';
+import { ErreurIa, type AudioIa, type Consigne, type FournisseurIa, type ImageIa, type OptionsAppel, type ReponseIa, type TranscriptionIa } from './fournisseur-ia';
 
 export interface ConfigOvh {
   /** L'adresse `/v1` d'OVHcloud AI Endpoints (hôte vérifié au démarrage contre `IA_HOTES_AUTORISES`). */
@@ -13,6 +13,13 @@ export interface ConfigOvh {
 }
 
 export type FetchIa = typeof fetch;
+
+/** Le corps d'une réponse `audio/transcriptions` en `verbose_json` (ce qu'on en lit). */
+interface ReponseTranscription {
+  text?: string;
+  language?: string;
+  segments?: Array<{ avg_logprob?: number }>;
+}
 
 /** Le corps d'une réponse `chat/completions` (ce qu'on en lit). */
 interface ReponseChat {
@@ -70,17 +77,22 @@ export class OvhOpenAiFournisseur implements FournisseurIa {
     return { valeur: interpreterJson(contenu, schema), modele: data.model ?? this.cfg.modeleVision, jetonsEntree: data.usage?.prompt_tokens ?? null, jetonsSortie: data.usage?.completion_tokens ?? null };
   }
 
-  /** Transcription (`audio/transcriptions`, Whisper) ; l'audio n'est pas conservé. Branchée au lot 4. */
-  async transcrire(audio: AudioIa, options: OptionsAppel): Promise<ReponseIa<string>> {
+  /**
+   * Transcription (`audio/transcriptions`, Whisper, lot 4) : multipart, langue forcée au français (la dictée de Moutar
+   * est en français ; à valider), `response_format: verbose_json` pour lire la langue reconnue et les segments — la
+   * confiance est exp(moyenne des `avg_logprob`), bornée 0-1, null sans segment. L'audio n'est pas conservé ; rien
+   * d'autre ne part (ni identité, ni EAN).
+   */
+  async transcrire(audio: AudioIa, options: OptionsAppel): Promise<ReponseIa<TranscriptionIa>> {
     const form = new FormData();
     form.append('model', this.cfg.modeleAudio);
     form.append('language', 'fr');
-    form.append('response_format', 'json');
+    form.append('response_format', 'verbose_json');
     form.append('file', new Blob([new Uint8Array(audio.octets)], { type: audio.type }), audio.nomFichier);
     const res = await this.appeler(`${this.baseUrl}/audio/transcriptions`, { method: 'POST', headers: this.entetes(false), body: form, signal: options.signal });
-    const data = await lireCorps<{ text?: string }>(res);
+    const data = await lireCorps<ReponseTranscription>(res);
     if (typeof data.text !== 'string') throw new ErreurIa('reponse_illisible', 'Le moteur n’a pas rendu de texte.');
-    return { valeur: data.text, modele: this.cfg.modeleAudio, jetonsEntree: null, jetonsSortie: null };
+    return { valeur: { texte: data.text.trim(), langue: typeof data.language === 'string' && data.language ? data.language : null, confiance: confianceDesSegments(data.segments) }, modele: this.cfg.modeleAudio, jetonsEntree: null, jetonsSortie: null };
   }
 
   private poster(chemin: string, corps: unknown, signal: AbortSignal, tolerer400 = false): Promise<Response> {
@@ -113,6 +125,14 @@ export class OvhOpenAiFournisseur implements FournisseurIa {
     if (this.cfg.apiKey) h['Authorization'] = `Bearer ${this.cfg.apiKey}`;
     return h;
   }
+}
+
+/** Pure : exp(moyenne des log-probabilités moyennes des segments), bornée 0-1 ; null sans segment chiffré. */
+export function confianceDesSegments(segments: ReponseTranscription['segments']): number | null {
+  const valeurs = (segments ?? []).map((s) => s.avg_logprob).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (valeurs.length === 0) return null;
+  const moyenne = valeurs.reduce((a, b) => a + b, 0) / valeurs.length;
+  return Math.round(Math.min(1, Math.max(0, Math.exp(moyenne))) * 100) / 100;
 }
 
 async function lireCorps<T>(res: Response): Promise<T> {

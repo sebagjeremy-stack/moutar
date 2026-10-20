@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import { ErreurMetier } from '../../common/erreurs/erreur-metier';
 import type { Env } from '../../config/env';
 import { AnthropicFournisseur } from './anthropic-fournisseur';
-import { ErreurIa, STATUT_ERREUR_IA, type AudioIa, type Consigne, type FournisseurIa, type ImageIa, type ReponseIa, type UsageIa } from './fournisseur-ia';
+import { ErreurIa, STATUT_ERREUR_IA, type AudioIa, type Consigne, type FournisseurIa, type ImageIa, type ReponseIa, type TranscriptionIa, type UsageIa } from './fournisseur-ia';
 import { JournalIaService, type JournalIa } from './journal-ia.service';
 import { OvhOpenAiFournisseur } from './ovh-openai-fournisseur';
 
@@ -55,7 +55,7 @@ export class MoteurIa {
     return this.appeler(usage, (f, signal) => f.lireImage(image, consigne, schema, { signal }));
   }
 
-  transcrire(audio: AudioIa): Promise<ReponseIa<string>> {
+  transcrire(audio: AudioIa): Promise<ReponseIa<TranscriptionIa>> {
     return this.appeler('transcription', (f, signal) => f.transcrire(audio, { signal }));
   }
 

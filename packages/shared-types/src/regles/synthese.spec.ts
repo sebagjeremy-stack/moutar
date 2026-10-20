@@ -135,3 +135,23 @@ describe('synthèse : une marque citée sous une autre rubrique (lot 3, correcti
     expect(s.proposerScanIngredients).toBe(true);
   });
 });
+
+describe('synthèse : la communauté (lot 5, niveau 3)', () => {
+  const communaute = (statut: LigneSynthese['statut'], mention: string | null) => l({ niveau: 3, statut, source: 'Les Bons Plans Cachères', mention });
+  it('un « cite » validé fonde un « permis » seulement si le seuil atteint 3', () => {
+    const lignes = [l({ niveau: 1 }), l({ niveau: 2, statut: 'non_cite' }), communaute('cite', 'communauté · LBPC'), l({ niveau: 4 })];
+    expect(calculerSynthese(lignes, 3, AUJOURDHUI)).toMatchObject({ verdict: 'permis', pastille: 'Permis · communauté · LBPC', niveauFondateur: 3 });
+    expect(calculerSynthese(lignes, 2, AUJOURDHUI)).toMatchObject({ verdict: 'non_verifie', pastille: 'Non vérifié' });
+  });
+  it('un « non_cite » communautaire ne fonde JAMAIS un « non cacher » : « Non vérifié », ambre', () => {
+    const s = calculerSynthese([l({ niveau: 1 }), l({ niveau: 2, statut: 'non_cite' }), communaute('non_cite', null), l({ niveau: 4 })], 4, AUJOURDHUI);
+    expect(s).toMatchObject({ verdict: 'non_verifie', ton: 'warn', pastille: 'Non vérifié' });
+  });
+  it('un « douteux » validé : « Non vérifié · douteux », fondé sur la communauté, la phrase le dit ; au seuil 2, rien', () => {
+    const lignes = [l({ niveau: 1 }), l({ niveau: 2, statut: 'non_cite' }), communaute('non_verifie', 'signalé douteux'), l({ niveau: 4 })];
+    const s = calculerSynthese(lignes, 3, AUJOURDHUI);
+    expect(s).toMatchObject({ verdict: 'non_verifie', ton: 'warn', pastille: 'Non vérifié · douteux', source: 'Les Bons Plans Cachères', niveauFondateur: 3 });
+    expect(s.phrase).toBe('Signalé douteux par Les Bons Plans Cachères (signalé douteux) : vérifiez avant d’acheter. Il reste la composition (niveau 4).');
+    expect(calculerSynthese(lignes, 2, AUJOURDHUI).pastille).toBe('Non vérifié');
+  });
+});

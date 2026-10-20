@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { ErreurIa } from './fournisseur-ia';
-import { OvhOpenAiFournisseur, type FetchIa } from './ovh-openai-fournisseur';
+import { OvhOpenAiFournisseur, confianceDesSegments, type FetchIa } from './ovh-openai-fournisseur';
 
 const schema = z.object({ texte: z.string(), confiance: z.number() });
 const image = { octets: Buffer.from('fausse image'), type: 'image/png' as const };
@@ -88,11 +88,23 @@ describe('OvhOpenAiFournisseur (HTTP simulé)', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).response_format).toBeUndefined();
   });
-  it('transcrire envoie un multipart à audio/transcriptions et rend le texte', async () => {
-    const fetchImpl = vi.fn<FetchIa>(async () => reponse(200, { text: 'bonjour' }));
+  it('transcrire envoie un multipart (verbose_json, langue fr) à audio/transcriptions et rend texte, langue, confiance', async () => {
+    const fetchImpl = vi.fn<FetchIa>(async () => reponse(200, { text: ' bonjour ', language: 'fr', segments: [{ avg_logprob: -0.1 }, { avg_logprob: -0.3 }] }));
     const r = await new OvhOpenAiFournisseur(cfg, fetchImpl).transcrire({ octets: Buffer.from('audio'), type: 'audio/webm', nomFichier: 'd.webm' }, options);
-    expect(r).toEqual({ valeur: 'bonjour', modele: 'whisper', jetonsEntree: null, jetonsSortie: null });
+    expect(r).toEqual({ valeur: { texte: 'bonjour', langue: 'fr', confiance: 0.82 }, modele: 'whisper', jetonsEntree: null, jetonsSortie: null });
     expect(fetchImpl.mock.calls[0][0]).toBe('https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/audio/transcriptions');
-    expect(fetchImpl.mock.calls[0][1]?.body).toBeInstanceOf(FormData);
+    const form = fetchImpl.mock.calls[0][1]?.body as FormData;
+    expect(form).toBeInstanceOf(FormData);
+    expect(form.get('response_format')).toBe('verbose_json');
+    expect(form.get('language')).toBe('fr');
+    expect((form.get('file') as File).name).toBe('d.webm');
+  });
+  it('transcrire : sans segments la confiance est null ; sans texte → reponse_illisible', async () => {
+    const r = await new OvhOpenAiFournisseur(cfg, async () => reponse(200, { text: 'x' })).transcrire({ octets: Buffer.from('a'), type: 'audio/wav', nomFichier: 'd.wav' }, options);
+    expect(r.valeur).toEqual({ texte: 'x', langue: null, confiance: null });
+    expect(confianceDesSegments([{ avg_logprob: 0 }])).toBe(1);
+    expect(confianceDesSegments([])).toBeNull();
+    const e = await erreur(new OvhOpenAiFournisseur(cfg, async () => reponse(200, { language: 'fr' })).transcrire({ octets: Buffer.from('a'), type: 'audio/wav', nomFichier: 'd.wav' }, options));
+    expect(e.code).toBe('reponse_illisible');
   });
 });

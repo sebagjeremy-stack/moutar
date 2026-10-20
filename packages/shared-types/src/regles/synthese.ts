@@ -89,16 +89,21 @@ export function calculerSynthese(lignesBrutes: LigneSynthese[], seuil: Niveau, a
   }
   // Lot 3 (correction du lot 2) : une marque citée sous une rubrique ÉTRANGÈRE au produit ne fonde pas un « permis » ;
   // la ligne arrive `non_verifie` avec sa mention (« rubrique « X » : à vérifier »), et la synthèse le dit.
+  // Lot 5 : une contribution validée « douteux » (niveau 3) arrive de même `non_verifie` avec sa mention : la synthèse dit
+  // « Non vérifié · douteux », fondée sur la communauté — jamais un « non cacher » (Moutar cite, il ne décide pas).
   const aVerifier = lues.find((l) => l.statut === 'non_verifie' && l.niveau !== 4 && l.mention);
+  const douteux = aVerifier?.niveau === 3;
   return {
     verdict: 'non_verifie',
     ton,
-    pastille: perimee ? 'Non vérifié · liste périmée' : aVerifier ? 'Non vérifié · à vérifier' : 'Non vérifié',
+    pastille: perimee ? 'Non vérifié · liste périmée' : douteux ? 'Non vérifié · douteux' : aVerifier ? 'Non vérifié · à vérifier' : 'Non vérifié',
     source: perimee?.source ?? aVerifier?.source ?? null,
     niveauFondateur: perimee?.niveau ?? aVerifier?.niveau ?? null,
     phrase: perimee
       ? `Cité seulement par une source périmée (${perimee.source ?? 'sans nom'}). Il reste la composition (niveau 4).`
-      : aVerifier
+      : douteux
+        ? `Signalé douteux par ${aVerifier?.source ?? 'la communauté'} (${aVerifier?.mention}) : vérifiez avant d’acheter. Il reste la composition (niveau 4).`
+        : aVerifier
         ? `Cité par ${aVerifier.source ?? 'une liste'} sous une autre rubrique (${aVerifier.mention}) : vérifiez que ce produit en relève. Il reste la composition (niveau 4).`
         : compositionLue
           ? 'Aucun logo lu, aucune liste ne cite ce produit. La composition (niveau 4) a été lue : voir ci-dessous.'

@@ -1,6 +1,8 @@
-import type { AnalyseComposition, CertificationProduit, LigneCarte, Produit, SousLigneListe } from '@moutar/shared-types';
+import type { AnalyseComposition, CertificationProduit, ContributionPublique, LigneCarte, Produit, SousLigneListe } from '@moutar/shared-types';
+import { SOURCES_CONTRIBUTION } from '@moutar/shared-types/catalogues/contributions';
 import { calculerSynthese, type LigneSynthese } from '@moutar/shared-types/regles/synthese';
 import { AVERTISSEMENT_COMPOSITION, SOURCE_TABLE } from '../analyse/analyse-composition-regles';
+import { contributionFondatrice } from '../contributions/contributions-regles';
 import { NOM_COURT_LISTE } from '../listes/correspondance-liste-regles';
 
 /**
@@ -114,20 +116,47 @@ export function mentionSousLigne(s: SousLigneListe): string | null {
 // `calculerSynthese` est réexporté pour que le service n'importe la synthèse qu'une fois (par les règles de la carte).
 export { calculerSynthese };
 
-export function ligneCommunautaire(): LigneCarte {
-  return {
-    niveau: 3,
-    statut: 'non_verifie',
-    pastille: 'Non vérifié',
-    ton: 'warn',
-    source: null,
-    detail: 'Aucune contribution Les Bons Plans Cachères (lot 5).',
-    mention: null,
-    publieLe: null,
-    valableJusquAu: null,
-    composition: null,
-    avertissement: null,
-  };
+/**
+ * Niveau 3 (lot 5) : les contributions VALIDÉES à la console fondent la ligne — la plus récente (`contributionFondatrice`) :
+ * `cite` → vert « Validé par la communauté · LBPC », `publieLe` = le jour de la source, détail = ce que dit la source
+ * (200 caractères) ; `douteux` → ambre « Signalé douteux par la communauté » (statut `non_verifie`) ; `non_cite` → neutre
+ * « Non cité par la communauté » (statut `non_cite` : ce n'est PAS un « non »). Aucune validée mais une proposée → ambre
+ * « Contribution en attente de validation » ; rien → ambre « Non vérifié ». Jamais un « non cacher » : Moutar cite, il ne
+ * décide pas. `proposerContribution` est vrai tant qu'aucune validée ne fonde la ligne.
+ */
+export function ligneCommunautaire(validees: ContributionPublique[] = [], enAttente = 0): LigneCarte {
+  const base = { niveau: 3 as const, composition: null, avertissement: null, valableJusquAu: null, mention: null };
+  const c = contributionFondatrice(validees);
+  if (!c) {
+    if (enAttente > 0) {
+      return { ...base, statut: 'non_verifie', pastille: 'Contribution en attente de validation', ton: 'warn', source: null, detail: `${enAttente} contribution${enAttente > 1 ? 's' : ''} proposée${enAttente > 1 ? 's' : ''}, en attente de validation à la console : rien ne compte avant.`, publieLe: null, proposerContribution: true };
+    }
+    return { ...base, statut: 'non_verifie', pastille: 'Non vérifié', ton: 'warn', source: null, detail: 'Aucune contribution communautaire validée (Les Bons Plans Cachères ou autre) : vous pouvez en proposer une, sourcée.', publieLe: null, proposerContribution: true };
+  }
+  const source = SOURCES_CONTRIBUTION[c.sourceType];
+  const jour = c.sourceDate ? jourFr(c.sourceDate) : null;
+  const publieLe = c.sourceDate ?? c.valideeLe;
+  const dit = c.sourceTexte.length > 200 ? `${c.sourceTexte.slice(0, 199).trimEnd()}…` : c.sourceTexte;
+  const signe = c.auteurNom ? `, proposée par « ${c.auteurNom} »` : '';
+  const pied = `${jour ? `Source datée du ${jour}` : 'Source non datée'}${signe}, validée le ${JOUR.format(new Date(c.valideeLe))}${c.preuveUrl ? ' (preuve jointe)' : ''}.`;
+  if (c.statutPropose === 'cite') {
+    return { ...base, statut: 'cite', pastille: `Validé par la communauté · ${source.nomCourt}`, ton: 'ok', source: source.nom, detail: `${source.nom} : « ${dit} » ${pied}`, mention: `communauté · ${source.nomCourt}`, publieLe, proposerContribution: false };
+  }
+  if (c.statutPropose === 'douteux') {
+    return { ...base, statut: 'non_verifie', pastille: 'Signalé douteux par la communauté', ton: 'warn', source: source.nom, detail: `${source.nom} : « ${dit} » ${pied}`, mention: 'signalé douteux', publieLe, proposerContribution: false };
+  }
+  return { ...base, statut: 'non_cite', pastille: 'Non cité par la communauté', ton: 'neutre', source: source.nom, detail: `${source.nom} : « ${dit} » ${pied} Ce n’est pas un « non » : la source ne cite pas ce produit.`, publieLe, proposerContribution: false };
+}
+
+/** Ce que la synthèse lit du niveau 3 : la ligne telle quelle — jamais `non_casher`, par construction (`ligneCommunautaire`). */
+export function ligneSyntheseNiveau3(ligne: LigneCarte): LigneSynthese {
+  return { niveau: 3, statut: ligne.statut === 'non_casher' ? 'non_verifie' : ligne.statut, source: ligne.source, mention: ligne.mention, composition: null, valableJusquAu: null };
+}
+
+/** « 03/05/2026 » depuis un jour `AAAA-MM-JJ` (sans passer par un instant : aucun fuseau n'entre en jeu). */
+function jourFr(jour: string): string {
+  const [a, m, j] = jour.split('-');
+  return `${j}/${m}/${a}`;
 }
 
 const JOUR = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Paris' });

@@ -22,6 +22,13 @@ export interface AudioIa {
   nomFichier: string;
 }
 
+/** Ce qu'une transcription rend (lot 4) : le texte, la langue reconnue, une confiance 0-1 quand le moteur en donne une. */
+export interface TranscriptionIa {
+  texte: string;
+  langue: string | null;
+  confiance: number | null;
+}
+
 /** Une consigne : la partie « système » (rôle et format attendu) et la demande de l'utilisateur, en français. */
 export interface Consigne {
   systeme: string;
@@ -45,8 +52,8 @@ export interface FournisseurIa {
   readonly nom: NomFournisseur;
   /** Lit une image selon la consigne et rend l'objet JSON validé par `schema`. */
   lireImage<T>(image: ImageIa, consigne: Consigne, schema: z.ZodType<T, z.ZodTypeDef, unknown>, options: OptionsAppel): Promise<ReponseIa<T>>;
-  /** Transcrit un audio (lot 4 ; OVH seulement — Claude rend `non_supporte`). */
-  transcrire(audio: AudioIa, options: OptionsAppel): Promise<ReponseIa<string>>;
+  /** Transcrit un audio (lot 4 ; OVH seulement — Claude rend `non_supporte`). L'audio n'est jamais conservé. */
+  transcrire(audio: AudioIa, options: OptionsAppel): Promise<ReponseIa<TranscriptionIa>>;
 }
 
 /**

@@ -22,3 +22,15 @@ export function jourLocal(instant: Date = new Date(), fuseau: string = FUSEAU_DU
   const lire = (type: Intl.DateTimeFormatPartTypes): string => parts.find((p) => p.type === type)?.value ?? '';
   return `${lire('year')}-${lire('month')}-${lire('day')}`;
 }
+
+/**
+ * L'instant où COMMENCE un jour `AAAA-MM-JJ` dans le fuseau du centre (minuit à Paris, soit 22 h ou 23 h UTC la veille) :
+ * ce qu'une statistique « du jour » compare à `created_at`. Jamais `current_date` en SQL (le réglage de PostgreSQL).
+ */
+export function debutDuJour(jour: string, fuseau: string = FUSEAU_DU_CENTRE): Date {
+  const base = new Date(`${jour}T00:00:00Z`);
+  const parts = new Intl.DateTimeFormat('fr-FR', { timeZone: fuseau, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(base);
+  const lire = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((p) => p.type === type)?.value ?? '0');
+  // À 00:00 UTC, la pendule du centre marque déjà `h` heures : minuit local était `h` heures plus tôt.
+  return new Date(base.getTime() - (lire('hour') * 60 + lire('minute')) * 60_000);
+}

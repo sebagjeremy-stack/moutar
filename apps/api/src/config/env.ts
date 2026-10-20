@@ -31,6 +31,8 @@ const schemaEnv = z.object({
   /** Hôtes EXACTS autorisés pour IA_BASE_URL, séparés par des virgules ; aucun sous-domaine implicite. */
   IA_HOTES_AUTORISES: videVautAbsente(z.string().optional()),
   OFF_BASE_URL: videVautAbsente(z.string().url().optional()).default('https://world.openfoodfacts.org'),
+  /** Lot 5 : les hôtes admis pour le lien de preuve d'une contribution (https seulement ; un sous-domaine de l'hôte compte). */
+  CONTRIBUTION_HOTES_PREUVE: videVautAbsente(z.string().optional()).default('facebook.com,lesbonsplanscachers.fr'),
   ADMIN_EMAIL_INITIAL: videVautAbsente(z.string().email().optional()),
 });
 
@@ -40,6 +42,13 @@ export type Env = z.infer<typeof schemaEnv>;
 export function hotesAutorises(env: Pick<Env, 'IA_HOTES_AUTORISES'>): string[] {
   return (env.IA_HOTES_AUTORISES ?? '')
     .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter((h) => h.length > 0);
+}
+
+/** Les hôtes admis pour une preuve de contribution (lot 5), en minuscules, sans vide. */
+export function hotesPreuve(env: Pick<Env, 'CONTRIBUTION_HOTES_PREUVE'>): string[] {
+  return env.CONTRIBUTION_HOTES_PREUVE.split(',')
     .map((h) => h.trim().toLowerCase())
     .filter((h) => h.length > 0);
 }

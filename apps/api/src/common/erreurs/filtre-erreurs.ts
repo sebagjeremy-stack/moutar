@@ -72,7 +72,7 @@ function messageParDefaut(statut: number): string {
   if (statut === 401) return 'Connexion requise.';
   if (statut === 403) return 'Accès refusé : cette session ne permet pas ce geste.';
   if (statut === 404) return 'Introuvable.';
-  if (statut === 413) return 'Le fichier envoyé est trop grand (8 Mo au plus pour une photo, 10 Mo pour un fichier de liste).';
+  if (statut === 413) return 'Le fichier envoyé est trop grand (8 Mo au plus pour une photo, 5 Mo pour un enregistrement, 10 Mo pour un fichier de liste).';
   if (statut === 429) return 'Trop de demandes : patientez un instant, puis réessayez.';
   return 'Erreur.';
 }

@@ -115,6 +115,17 @@ export interface TranscriptionOcr {
   confiance: number;
 }
 
+/* ---------- Lot 4 : transcription de secours (`POST /transcriptions`) ---------- */
+
+/** La transcription d'une dictée par le moteur (Whisper, OVH) quand la Web Speech API du navigateur fait défaut : rendue, jamais conservée. */
+export interface TranscriptionAudio {
+  texte: string;
+  /** La langue reconnue (`fr`…), ou null si le moteur ne la dit pas. */
+  langue: string | null;
+  /** 0 à 1 quand le moteur en donne une ; null sinon. */
+  confiance: number | null;
+}
+
 export interface Produit {
   id: string;
   ean: string | null;
@@ -185,6 +196,136 @@ export interface LigneCarte {
   avertissement: string | null;
   /** Niveau 2 seulement (lot 2) : ce que dit CHAQUE liste active, une sous-ligne par liste ; absent aux autres niveaux. */
   sousLignes?: SousLigneListe[];
+  /** Niveau 3 seulement (lot 5) : vrai quand aucune contribution validée ne fonde la ligne — l'écran propose « Proposer une contribution ». */
+  proposerContribution?: boolean;
+}
+
+/* ---------- Lot 5 : contributions communautaires (niveau 3), signalements ---------- */
+
+/** Ce qu'une contribution propose : cité (permis) par la source, non cité, douteux. Jamais « non cacher » (Moutar cite, il ne décide pas). */
+export type StatutContribution = 'cite' | 'non_cite' | 'douteux';
+/** La source citée : Les Bons Plans Cachères (`lbpc`), ou une autre source communautaire. */
+export type SourceContribution = 'lbpc' | 'autre';
+export type EtatContribution = 'proposee' | 'validee' | 'refusee';
+
+/** Ce que le public envoie (`POST /produits/:ean/contributions`). Les textes sont gardés en texte brut (balises retirées). */
+export interface PropositionContribution {
+  statutPropose: StatutContribution;
+  sourceType: SourceContribution;
+  /** Ce que dit la source (≤ 1 000 caractères). */
+  sourceTexte: string;
+  /** Le jour de la publication citée (`AAAA-MM-JJ`), ou null. */
+  sourceDate: string | null;
+  /** Un lien https vers un hôte admis (facebook.com, lesbonsplanscachers.fr…), ou null. */
+  preuveUrl: string | null;
+  /** Un pseudonyme (≤ 40), ou null. */
+  auteurNom: string | null;
+}
+
+export interface ContributionProposee {
+  id: string;
+  etat: 'proposee';
+}
+
+/** Une contribution VALIDÉE telle que le public la lit (`GET /produits/:ean/contributions`). */
+export interface ContributionPublique {
+  id: string;
+  statutPropose: StatutContribution;
+  sourceType: SourceContribution;
+  sourceTexte: string;
+  sourceDate: string | null;
+  preuveUrl: string | null;
+  auteurNom: string | null;
+  /** Instant de la validation à la console (ISO). */
+  valideeLe: string;
+}
+
+export interface ContributionsProduit {
+  contributions: ContributionPublique[];
+  /** Le nombre de contributions proposées, en attente de validation. */
+  enAttente: number;
+}
+
+/** Le produit tel que la console le nomme à côté d'une contribution ou d'un signalement. */
+export interface ProduitNomme {
+  id: string;
+  ean: string | null;
+  nom: string;
+  marque: string | null;
+}
+
+/** Une contribution à la console (`GET /admin/contributions?etat=`). */
+export interface ContributionConsole {
+  id: string;
+  produit: ProduitNomme;
+  niveau: Niveau;
+  statutPropose: StatutContribution;
+  sourceType: SourceContribution;
+  sourceTexte: string;
+  sourceDate: string | null;
+  preuveUrl: string | null;
+  auteurNom: string | null;
+  etat: EtatContribution;
+  valideeLe: string | null;
+  motifRefus: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type EtatSignalement = 'ouvert' | 'traite';
+
+/** « Signaler une erreur » sur une ligne de la carte (`POST /produits/:ean/signalements`). */
+export interface Signalement {
+  niveau: Niveau;
+  /** ≤ 500 caractères, texte brut. */
+  texte: string;
+}
+
+export interface SignalementCree {
+  id: string;
+  etat: 'ouvert';
+}
+
+export interface SignalementConsole {
+  id: string;
+  produit: ProduitNomme;
+  niveau: Niveau;
+  texte: string;
+  etat: EtatSignalement;
+  traiteLe: string | null;
+  createdAt: string;
+}
+
+/** Le tableau de bord de la console (`GET /admin/tableau`) : des COMPTES, jamais une personne. */
+export interface TableauConsole {
+  /** Le jour du centre (`AAAA-MM-JJ`) auquel « du jour » se rapporte. */
+  jour: string;
+  produitsLus: number;
+  contributionsEnAttente: number;
+  signalementsOuverts: number;
+  lecturesIaDuJour: number;
+}
+
+/** Une ligne de `journal_ia` lue à la console : des nombres et des codes, jamais un contenu (il n'y en a pas). */
+export interface LigneJournalIa {
+  id: string;
+  fournisseur: string;
+  modele: string;
+  usage: 'lecture_logo' | 'ocr_ingredients' | 'transcription';
+  dureeMs: number;
+  jetonsEntree: number | null;
+  jetonsSortie: number | null;
+  ok: boolean;
+  erreur: string | null;
+  createdAt: string;
+}
+
+export interface PageJournalIa {
+  lignes: LigneJournalIa[];
+  /** À partir de 1. */
+  page: number;
+  parPage: number;
+  total: number;
 }
 
 /* ---------- Lot 2 : listes officielles ---------- */

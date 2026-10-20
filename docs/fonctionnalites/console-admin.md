@@ -16,8 +16,10 @@ Socle posé au lot 1 (20/10/2026). Un seul compte, celui du médecin-utilisateur
 
 - **Certificateurs (lot 3, 20/10/2026)** : `GET /admin/certificateurs[/:code]` (le catalogue EN CODE fusionné à `certificateur_surcharge`), `PUT /admin/certificateurs/:code` `{ actif, note? }` (journal `certificateur.surcharge`, dans la transaction). Un certificateur désactivé n'est plus proposé à la lecture d'un logo, ne fonde plus une validation, et une certification déjà validée avec lui redevient « Non vérifié » sur la carte. Le journal `journal_ia` (appels au moteur d'IA, sans contenu) est en ajout seul comme `journal_admin` ; sa lecture à la console viendra avec l'écran. Contrat et décisions : `lot-3-ia-logo-ocr.md`.
 
+- **Contributions et signalements (lot 5, 20/10/2026)** : `GET /admin/contributions?etat=` (défaut `proposee`, avec le produit nommé), `PUT /admin/contributions/:id` `{ etat: 'validee' | 'refusee', motifRefus? }` — une transaction sous le verrou du produit, verdict de niveau 3 écrit à la validation et retiré au refus, journal `contribution.validation` / `contribution.refus` ; `GET /admin/signalements?etat=` (défaut `ouvert`), `PUT /admin/signalements/:id` `{ etat: 'traite' }` (journal `signalement.traitement`) ; `GET /admin/journal-ia?page=` (lecture seule, 50 par page, sans contenu) ; `GET /admin/tableau` (des comptes : produits lus, contributions en attente, signalements ouverts, lectures IA du jour — « du jour » = depuis minuit à la pendule du centre). Aucune donnée personnelle : les contributions ne portent qu'un pseudonyme facultatif. Contrat et décisions : `lot-5-contributions.md`.
+
 ## Reste
 - **BLOQUANT avant mise en ligne : un rôle applicatif PostgreSQL distinct, non superutilisateur, sans droit UPDATE/DELETE/TRUNCATE sur les journaux** (l'API s'y connecte ; les migrations gardent le propriétaire). Tant qu'il n'existe pas, l'ajout seul du journal ne tient que par les déclencheurs.
 - Changer son mot de passe depuis la console ; plusieurs comptes (modérateurs du lot 5).
-- Validation des contributions (lot 5) ; lecture de `journal_ia` (consommation du moteur d'IA) à la console.
+- Pages de l'écran pour les contributions, les signalements, le journal IA et le tableau (les routes existent, lot 5).
 - Limite de débit en mémoire : suffisante pour une instance ; à revoir si plusieurs.

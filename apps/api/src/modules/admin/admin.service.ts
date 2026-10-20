@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, isNull } from 'drizzle-orm';
-import type { Additif, Certificateur, StatutAdditif } from '@moutar/shared-types';
+import { and, count, desc, eq, gt, gte, isNull } from 'drizzle-orm';
+import type { Additif, Certificateur, PageJournalIa, StatutAdditif, TableauConsole } from '@moutar/shared-types';
 import { ADDITIFS } from '@moutar/shared-types/catalogues/additifs';
 import { CERTIFICATEURS } from '@moutar/shared-types/catalogues/certificateurs';
 import { ErreurMetier } from '../../common/erreurs/erreur-metier';
 import { LimiteDeDebit } from '../../common/auth/limite-de-debit';
 import type { Database } from '../../database/client';
 import { DRIZZLE } from '../../database/database.module';
-import { additifSurcharge, certificateurSurcharge, compteAdmin, journalAdmin, sessionAdmin } from '../../database/schema';
+import { debutDuJour, jourLocal } from '../../common/temps/jour-local';
+import { additifSurcharge, certificateurSurcharge, compteAdmin, contribution, journalAdmin, journalIa, produit, sessionAdmin, signalement } from '../../database/schema';
 import { HASH_LEURRE, verifierMotDePasse } from './mot-de-passe';
 import { DUREE_SESSION_MS, genererJeton, hacherJeton } from './session-admin';
 
@@ -33,6 +34,8 @@ export interface CertificateurConsole extends Certificateur {
 }
 
 const FENETRE_MS = 15 * 60 * 1000;
+/** Lot 5 : la pagination du journal du moteur d'IA à la console. */
+export const LIGNES_JOURNAL_IA = 50;
 const ESSAIS = 10;
 
 /** Pure : un e-mail tronqué pour le journal (« adm…@exemple.fr ») — jamais l'adresse entière d'un essai refusé. */
@@ -163,6 +166,29 @@ export class AdminService {
       .orderBy(desc(journalAdmin.createdAt))
       .limit(limite);
     return lignes.map((l) => ({ ...l, createdAt: l.createdAt.toISOString() }));
+  }
+
+  /** Lot 5 : le journal du moteur d'IA, lecture seule, 50 lignes par page (page 1 = les plus récentes) — sans contenu, il n'y en a pas. */
+  async journalIa(page = 1, parPage = LIGNES_JOURNAL_IA): Promise<PageJournalIa> {
+    const p = Math.max(1, Math.floor(page));
+    const [total] = await this.db.select({ n: count() }).from(journalIa);
+    const lignes = await this.db
+      .select()
+      .from(journalIa)
+      .orderBy(desc(journalIa.createdAt))
+      .limit(parPage)
+      .offset((p - 1) * parPage);
+    return { lignes: lignes.map((l) => ({ ...l, createdAt: l.createdAt.toISOString() })), page: p, parPage, total: Number(total?.n ?? 0) };
+  }
+
+  /** Lot 5 : le tableau de bord — des COMPTES, jamais une personne ; « du jour » = le jour de la pendule du centre. */
+  async tableau(maintenant: Date = new Date()): Promise<TableauConsole> {
+    const jour = jourLocal(maintenant);
+    const [produits] = await this.db.select({ n: count() }).from(produit).where(isNull(produit.deletedAt));
+    const [contributions] = await this.db.select({ n: count() }).from(contribution).where(and(eq(contribution.etat, 'proposee'), isNull(contribution.deletedAt)));
+    const [signalements] = await this.db.select({ n: count() }).from(signalement).where(eq(signalement.etat, 'ouvert'));
+    const [lectures] = await this.db.select({ n: count() }).from(journalIa).where(gte(journalIa.createdAt, debutDuJour(jour)));
+    return { jour, produitsLus: Number(produits?.n ?? 0), contributionsEnAttente: Number(contributions?.n ?? 0), signalementsOuverts: Number(signalements?.n ?? 0), lecturesIaDuJour: Number(lectures?.n ?? 0) };
   }
 
   /** La voie d'écriture du journal d'administration (ajout seul) ; `journaliserSur` pour écrire DANS une transaction. */

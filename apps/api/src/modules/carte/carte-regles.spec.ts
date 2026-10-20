@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { CertificationProduit, Produit, SousLigneListe } from '@moutar/shared-types';
+import type { CertificationProduit, ContributionPublique, Produit, SousLigneListe } from '@moutar/shared-types';
 import { analyserComposition } from '../analyse/analyse-composition-regles';
-import { calculerSynthese, ligneCertifie, ligneComposition, ligneListeOfficielle, ligneSyntheseNiveau1, lignesSyntheseNiveau2 } from './carte-regles';
+import { calculerSynthese, ligneCertifie, ligneCommunautaire, ligneComposition, ligneListeOfficielle, ligneSyntheseNiveau1, ligneSyntheseNiveau3, lignesSyntheseNiveau2 } from './carte-regles';
 
 const p: Produit = { id: 'x', ean: '1', nom: 'Test', marque: null, imageUrl: null, ingredientsTexte: null, additifs: [], source: 'off', luLe: '2026-10-20T10:00:00Z' };
 
@@ -160,5 +160,106 @@ describe('ligne du niveau 1 (lot 3)', () => {
     expect(l).toMatchObject({ statut: 'non_verifie', ton: 'warn', pastille: 'Non vérifié', mention: null });
     expect(l.detail).toContain('plus reconnu');
     expect(calculerSynthese([ligneSyntheseNiveau1(l, { ...certification, certificateurActif: false })], 1, '2026-10-20').verdict).toBe('non_verifie');
+  });
+});
+
+const contrib = (extra: Partial<ContributionPublique>): ContributionPublique => ({
+  id: 'c1',
+  statutPropose: 'cite',
+  sourceType: 'lbpc',
+  sourceTexte: 'Validé par le groupe le 3 mai : « OK selon le Rav »',
+  sourceDate: '2026-05-03',
+  preuveUrl: 'https://facebook.com/groups/lbpc/posts/1',
+  auteurNom: 'Sarah',
+  valideeLe: '2026-10-20T10:00:00.000Z',
+  ...extra,
+});
+const AUJOURDHUI = '2026-10-20';
+const autour = (niveau3: ReturnType<typeof ligneCommunautaire>, seuil: 1 | 2 | 3 | 4) =>
+  calculerSynthese([{ niveau: 1, statut: 'non_verifie', source: null, mention: null, composition: null }, { niveau: 2, statut: 'non_cite', source: null, mention: null, composition: null }, ligneSyntheseNiveau3(niveau3), { niveau: 4, statut: 'non_verifie', source: null, mention: null, composition: null }], seuil, AUJOURDHUI);
+
+describe('ligne du niveau 3 (lot 5, contributions communautaires)', () => {
+  it('rien : « Non vérifié », ambre, « Proposer une contribution »', () => {
+    const l = ligneCommunautaire([], 0);
+    expect(l).toMatchObject({ niveau: 3, statut: 'non_verifie', pastille: 'Non vérifié', ton: 'warn', source: null, publieLe: null, valableJusquAu: null, proposerContribution: true });
+    expect(l.detail).toMatch(/proposer/i);
+    expect(ligneCommunautaire()).toEqual(l);
+  });
+  it('aucune validée mais une proposée : « Contribution en attente de validation », ambre, rien ne compte', () => {
+    const l = ligneCommunautaire([], 2);
+    expect(l).toMatchObject({ statut: 'non_verifie', pastille: 'Contribution en attente de validation', ton: 'warn', source: null, proposerContribution: true });
+    expect(l.detail).toContain('2 contributions proposées');
+    expect(autour(l, 3).verdict).toBe('non_verifie');
+  });
+  it('validée « cite » : vert « Validé par la communauté · LBPC », source LBPC, publié le jour de la source, détail = ce que dit la source', () => {
+    const l = ligneCommunautaire([contrib({})], 0);
+    expect(l).toMatchObject({ statut: 'cite', pastille: 'Validé par la communauté · LBPC', ton: 'ok', source: 'Les Bons Plans Cachères', mention: 'communauté · LBPC', publieLe: '2026-05-03', valableJusquAu: null, proposerContribution: false });
+    expect(l.detail).toContain('« Validé par le groupe le 3 mai : « OK selon le Rav » »');
+    expect(l.detail).toContain('Source datée du 03/05/2026');
+    expect(l.detail).toContain('proposée par « Sarah »');
+    expect(l.detail).toContain('validée le 20/10/2026');
+    expect(l.detail).toContain('preuve jointe');
+  });
+  it('le détail tronque ce que dit la source à 200 caractères', () => {
+    const l = ligneCommunautaire([contrib({ sourceTexte: 'x'.repeat(300) })], 0);
+    expect(l.detail).toContain(`« ${'x'.repeat(199)}… »`);
+    expect(l.detail).not.toContain('x'.repeat(200));
+  });
+  it('sans date de source ni pseudonyme ni preuve : publié à la validation, « Source non datée »', () => {
+    const l = ligneCommunautaire([contrib({ sourceDate: null, auteurNom: null, preuveUrl: null })], 0);
+    expect(l.publieLe).toBe('2026-10-20T10:00:00.000Z');
+    expect(l.detail).toContain('Source non datée');
+    expect(l.detail).not.toMatch(/proposée par|preuve/);
+  });
+  it('validée « douteux » : ambre « Signalé douteux par la communauté », statut non_verifie, mention « signalé douteux »', () => {
+    const l = ligneCommunautaire([contrib({ statutPropose: 'douteux' })], 0);
+    expect(l).toMatchObject({ statut: 'non_verifie', pastille: 'Signalé douteux par la communauté', ton: 'warn', source: 'Les Bons Plans Cachères', mention: 'signalé douteux', proposerContribution: false });
+  });
+  it('validée « non_cite » : neutre « Non cité par la communauté », statut non_cite — jamais un « non »', () => {
+    const l = ligneCommunautaire([contrib({ statutPropose: 'non_cite' })], 0);
+    expect(l).toMatchObject({ statut: 'non_cite', pastille: 'Non cité par la communauté', ton: 'neutre', source: 'Les Bons Plans Cachères', mention: null });
+    expect(l.detail).toContain('Ce n’est pas un « non »');
+  });
+  it('la source « autre » : « Validé par la communauté · communauté », fondée sur « Communauté Moutar »', () => {
+    const l = ligneCommunautaire([contrib({ sourceType: 'autre' })], 0);
+    expect(l).toMatchObject({ pastille: 'Validé par la communauté · communauté', source: 'Communauté Moutar', mention: 'communauté · communauté' });
+  });
+  it('plusieurs validées : la plus récente par le jour de sa source fonde la ligne, même si une proposée attend', () => {
+    const vieille = contrib({ id: 'a', statutPropose: 'cite', sourceDate: '2026-01-10' });
+    const recente = contrib({ id: 'b', statutPropose: 'douteux', sourceDate: '2026-09-01' });
+    expect(ligneCommunautaire([vieille, recente], 1).pastille).toBe('Signalé douteux par la communauté');
+    expect(ligneCommunautaire([recente, vieille], 0).pastille).toBe('Signalé douteux par la communauté');
+    expect(ligneCommunautaire([vieille], 0).pastille).toBe('Validé par la communauté · LBPC');
+  });
+  it('jamais rouge, jamais non_casher, quel que soit le statut proposé', () => {
+    for (const statutPropose of ['cite', 'non_cite', 'douteux'] as const) {
+      const l = ligneCommunautaire([contrib({ statutPropose })], 0);
+      expect(l.ton).not.toBe('danger');
+      expect(l.statut).not.toBe('non_casher');
+      expect(ligneSyntheseNiveau3(l).statut).not.toBe('non_casher');
+      expect(autour(l, 4).verdict).not.toBe('non_casher');
+    }
+  });
+  it('synthèse : un « cite » validé fonde un « permis » au seuil 3 ou 4 seulement ; au seuil 2, « non vérifié »', () => {
+    const l = ligneCommunautaire([contrib({})], 0);
+    expect(autour(l, 3)).toMatchObject({ verdict: 'permis', pastille: 'Permis · communauté · LBPC', source: 'Les Bons Plans Cachères', niveauFondateur: 3 });
+    expect(autour(l, 4).verdict).toBe('permis');
+    expect(autour(l, 2)).toMatchObject({ verdict: 'non_verifie', pastille: 'Non vérifié' });
+    expect(autour(l, 1).verdict).toBe('non_verifie');
+  });
+  it('synthèse : un « non_cite » communautaire → « Non vérifié » ambre, JAMAIS rouge ; un « douteux » → « Non vérifié · douteux »', () => {
+    const nonCite = autour(ligneCommunautaire([contrib({ statutPropose: 'non_cite' })], 0), 3);
+    expect(nonCite).toMatchObject({ verdict: 'non_verifie', ton: 'warn', pastille: 'Non vérifié' });
+    const douteux = autour(ligneCommunautaire([contrib({ statutPropose: 'douteux' })], 0), 3);
+    expect(douteux).toMatchObject({ verdict: 'non_verifie', ton: 'warn', pastille: 'Non vérifié · douteux', source: 'Les Bons Plans Cachères', niveauFondateur: 3 });
+    expect(douteux.phrase).toContain('Signalé douteux par Les Bons Plans Cachères');
+    expect(autour(ligneCommunautaire([contrib({ statutPropose: 'douteux' })], 0), 2).pastille).toBe('Non vérifié');
+  });
+  it('synthèse : une liste officielle qui cite l’emporte sur la communauté (niveau plus haut) ; un « non cacher » de la composition l’emporte sur un « cite » communautaire', () => {
+    const communaute = ligneSyntheseNiveau3(ligneCommunautaire([contrib({})], 0));
+    const liste = calculerSynthese([{ niveau: 2, statut: 'cite', source: 'Consistoire', mention: null, composition: null }, communaute], 3, AUJOURDHUI);
+    expect(liste).toMatchObject({ verdict: 'permis', niveauFondateur: 2 });
+    const non = calculerSynthese([communaute, { niveau: 4, statut: 'non_casher', source: 'Table', mention: null, composition: 'non_casher' }], 3, AUJOURDHUI);
+    expect(non).toMatchObject({ verdict: 'non_casher', niveauFondateur: 4 });
   });
 });
