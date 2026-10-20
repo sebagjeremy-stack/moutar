@@ -11,7 +11,7 @@ import { formaterJour, formaterJourCivil, jourLocal } from '../../lib/dates';
 import { phraseErreur } from '../../lib/erreurs';
 import { CODES_LISTES, LIBELLE_CODE } from '../../lib/listes';
 import { EtatNonLu, useLecture } from './lecture';
-import { incoherenceLigne, numerosIncoherents } from './lignes-regles';
+import { incoherenceLigne, numerosIncoherents, rubriqueReservee } from './lignes-regles';
 
 /*
  * L'onglet « Listes » de la console (lot 2) : les éditions importées, l'import d'une édition (aperçu analysé, lignes
@@ -21,9 +21,12 @@ import { incoherenceLigne, numerosIncoherents } from './lignes-regles';
 
 type Refus = (statut: number) => void;
 type Apercu = { lignes: LigneAnalysee[]; avertissements: string[]; note: string | null; fichierNom: string | null };
-type ReponseLignes = { liste: ListeOfficielle; compte: number; lignes: LigneListe[] };
+type ReponseLignes = { liste: ListeOfficielle; compte: number; lignes: LigneListe[]; tronque?: boolean };
 
 const LIGNES_PAR_PAGE = 200;
+/** Le texte collé d'une liste : 1 000 000 caractères au plus (≈ 1 Mo, la limite du corps JSON) ; au-delà, le fichier. */
+const MAX_TEXTE_COLLE = 1_000_000;
+const nombre = (n: number) => n.toLocaleString('fr-FR');
 
 /** « publiée le 01/07/2025 · valable jusqu’au 31/07/2026 », ou leur absence, dite. */
 function datesListe(l: Pick<ListeOfficielle, 'publieLe' | 'valableJusquAu'>): string {
@@ -126,13 +129,15 @@ function ImportListe({ surRefus, surImporte, surAnnule }: { surRefus: Refus; sur
     }
     setEnvoi('apercu');
     let r;
+    // Le titre, s'il est déjà saisi, part avec l'aperçu : l'analyse ignore les lignes qui lui sont égales (en-tête répété).
     if (fichier) {
       const fd = new FormData();
       fd.append('code', code);
+      if (titre.trim()) fd.append('titre', titre.trim());
       fd.append('fichier', fichier);
       r = await appel<Apercu>('/api/v1/admin/listes/apercu', { method: 'POST', body: fd });
     } else {
-      r = await envoyer<Apercu>('/api/v1/admin/listes/apercu', { code, texte });
+      r = await envoyer<Apercu>('/api/v1/admin/listes/apercu', { code, texte, titre: titre.trim() || null });
     }
     setEnvoi('aucun');
     if (!r.ok) {
@@ -176,8 +181,8 @@ function ImportListe({ surRefus, surImporte, surAnnule }: { surRefus: Refus; sur
   };
 
   return (
-    <div id="import-liste" className="flex flex-col gap-3 rounded-sm border border-border bg-surface-2 p-4">
-      <form className="flex flex-col gap-3" onSubmit={analyser}>
+    <div id="import-liste" className="flex min-w-0 max-w-full flex-col gap-3 rounded-sm border border-border bg-surface-2 p-4">
+      <form className="flex min-w-0 flex-col gap-3" onSubmit={analyser}>
         <h2 className="text-17 font-semibold">Importer une édition</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-[6px]">
@@ -198,7 +203,15 @@ function ImportListe({ surRefus, surImporte, surAnnule }: { surRefus: Refus; sur
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Champ id="import-fichier" etiquette="Fichier (PDF, texte ou CSV, 10 Mo au plus)" type="file" accept=".pdf,.txt,.csv,text/plain,text/csv,application/pdf" className="py-[8px]" onChange={(e) => setFichier(e.target.files?.[0] ?? null)} />
-          <ZoneTexte id="import-texte" etiquette="… ou le texte collé" aide="Le fichier l’emporte s’il est choisi. Le texte est analysé, jamais gardé tel quel." value={texte} onChange={(e) => setTexte(e.target.value)} className="min-h-[96px]" maxLength={2_000_000} />
+          <ZoneTexte
+            id="import-texte"
+            etiquette="… ou le texte collé"
+            aide={`Le fichier l’emporte s’il est choisi. Le texte est analysé, jamais gardé tel quel. ${nombre(MAX_TEXTE_COLLE)} caractères au plus (≈ 1 Mo) : au-delà, importez par fichier.`}
+            value={texte}
+            onChange={(e) => setTexte(e.target.value)}
+            className="min-h-[96px]"
+            maxLength={MAX_TEXTE_COLLE}
+          />
         </div>
         <div className="flex flex-wrap gap-2">
           <Bouton type="submit" variante="primaire" disabled={envoi !== 'aucun'}>
@@ -209,7 +222,7 @@ function ImportListe({ surRefus, surImporte, surAnnule }: { surRefus: Refus; sur
       </form>
 
       {apercu ? (
-        <section aria-labelledby="titre-apercu" className="flex flex-col gap-3">
+        <section aria-labelledby="titre-apercu" className="flex min-w-0 flex-col gap-3">
           <h2 id="titre-apercu" className="text-17 font-semibold">
             Aperçu · {lignes.length} ligne{lignes.length > 1 ? 's' : ''} lue{lignes.length > 1 ? 's' : ''}
             {apercu.fichierNom ? <span className="muet"> · {apercu.fichierNom}</span> : null}
@@ -221,7 +234,9 @@ function ImportListe({ surRefus, surImporte, surAnnule }: { surRefus: Refus; sur
               </p>
               <ul className="ml-5 list-disc">
                 {apercu.avertissements.map((a, i) => (
-                  <li key={i}>{a}</li>
+                  <li key={i} className="break-words">
+                    {a}
+                  </li>
                 ))}
               </ul>
             </Bandeau>
@@ -249,7 +264,11 @@ function ImportListe({ surRefus, surImporte, surAnnule }: { surRefus: Refus; sur
   );
 }
 
-/** Les lignes de l'aperçu, éditables en place : un tableau, 200 lignes par page, l'incohérence dite à côté de la ligne. */
+/**
+ * Les lignes de l'aperçu, éditables en place : un tableau qui défile dans SON conteneur (jamais la page), 200 lignes par
+ * page, l'incohérence dite à côté de la ligne ; la case « Réservée » se recalcule quand le texte de la rubrique change
+ * (et reste cochable en plus — le serveur recalcule aussi).
+ */
 function TableLignes({ lignes, surChange }: { lignes: LigneAnalysee[]; surChange: (l: LigneAnalysee[]) => void }) {
   const [page, setPage] = useState(0);
   const pages = Math.max(1, Math.ceil(lignes.length / LIGNES_PAR_PAGE));
@@ -257,6 +276,7 @@ function TableLignes({ lignes, surChange }: { lignes: LigneAnalysee[]; surChange
   const debut = p * LIGNES_PAR_PAGE;
   const visibles = lignes.slice(debut, debut + LIGNES_PAR_PAGE);
   const modifier = (i: number, champ: Partial<LigneAnalysee>) => surChange(lignes.map((l, j) => (j === i ? { ...l, ...champ } : l)));
+  const renommer = (i: number, rubrique: string) => modifier(i, { rubrique, rubriqueReservee: rubriqueReservee(rubrique) });
   const retirer = (i: number) => surChange(lignes.filter((_, j) => j !== i));
   const ajouter = () => {
     surChange([...lignes, { rubrique: '', marque: null, produitLibelle: null, mention: null, touteMarque: false, rubriqueReservee: false, ordre: lignes.length }]);
@@ -264,14 +284,15 @@ function TableLignes({ lignes, surChange }: { lignes: LigneAnalysee[]; surChange
   };
   const incoherentes = numerosIncoherents(lignes);
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 max-w-full flex-col gap-2">
       {incoherentes.length ? (
         <p className="text-warn font-semibold" role="status">
           {incoherentes.length} ligne{incoherentes.length > 1 ? 's' : ''} incohérente{incoherentes.length > 1 ? 's' : ''} à corriger avant l’import (n° {incoherentes.slice(0, 10).join(', ')}
           {incoherentes.length > 10 ? '…' : ''}).
         </p>
       ) : null}
-      <div className="overflow-x-auto">
+      {/* `relative` : le conteneur qui défile est aussi le bloc conteneur du texte masqué (`.cache-visuel`, positionné), sinon ce texte élargit la PAGE. */}
+      <div className="relative w-full min-w-0 max-w-full overflow-x-auto" data-defile="lignes-apercu">
         <table className="w-full min-w-[760px] border-collapse text-note">
           <thead>
             <tr className="text-left">
@@ -309,7 +330,7 @@ function TableLignes({ lignes, surChange }: { lignes: LigneAnalysee[]; surChange
                 <tr key={i} className="border-t border-border align-top">
                   <td className="px-1 py-1 pt-[14px] text-muted">{i + 1}</td>
                   <td className="px-1 py-1">
-                    <input className="champ min-h-[40px] px-2 py-1" aria-label={`Rubrique, ligne ${i + 1}`} value={l.rubrique} onChange={(e) => modifier(i, { rubrique: e.target.value })} />
+                    <input className="champ min-h-[40px] px-2 py-1" aria-label={`Rubrique, ligne ${i + 1}`} value={l.rubrique} onChange={(e) => renommer(i, e.target.value)} />
                     {souci ? <p className="text-warn mt-1 text-small">{souci}</p> : null}
                   </td>
                   <td className="px-1 py-1">
@@ -373,24 +394,45 @@ export function ListeDetail({ surRefus }: { surRefus: Refus }) {
   const url = useMemo(() => `/api/v1/admin/listes/${encodeURIComponent(id)}/lignes${qEnvoye ? `?q=${encodeURIComponent(qEnvoye)}` : ''}`, [id, qEnvoye]);
   const { etat, charger, setEtat } = useLecture<ReponseLignes>(url, surRefus);
   const [ajout, setAjout] = useState(false);
+  // La dernière lecture réussie reste affichée (en-tête de la liste, champ de recherche MONTÉ, focus gardé) pendant qu'une
+  // nouvelle recherche charge ; seule la zone des lignes dit « Lecture… » ou « Non lu ».
+  const [connu, setConnu] = useState<ReponseLignes | null>(null);
+  useEffect(() => {
+    if (etat.phase === 'ok') setConnu(etat.data);
+  }, [etat]);
+  const donnees = etat.phase === 'ok' ? etat.data : connu;
+  const liste = donnees?.liste ?? null;
 
   const champRecherche = (
     <input className="champ max-w-[320px]" type="search" placeholder="Rubrique, marque, produit…" aria-label="Chercher dans les lignes" value={q} onChange={(e) => setQ(e.target.value)} />
   );
 
-  if (etat.phase !== 'ok') {
+  const poserListe = (l: ListeOfficielle) => {
+    if (etat.phase === 'ok') setEtat({ phase: 'ok', data: { ...etat.data, liste: l } });
+  };
+  const poserLignes = (ls: LigneListe[]) => {
+    if (etat.phase === 'ok') setEtat({ phase: 'ok', data: { ...etat.data, lignes: ls, compte: etat.data.compte + (ls.length - etat.data.lignes.length) } });
+  };
+
+  if (!liste) {
     return (
-      <section className="carte flex flex-col gap-3">
+      <section className="carte flex flex-col gap-3" aria-labelledby="titre-lignes">
         <Link to="/admin/listes" className="lien">
           ← Toutes les listes
         </Link>
-        <EtatNonLu etat={etat} recharger={() => void charger()} />
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 id="titre-lignes" className="text-17 font-semibold">
+            Lignes
+          </h2>
+          {champRecherche}
+        </div>
+        <EtatNonLu etat={etat.phase === 'ok' ? { phase: 'chargement' } : etat} recharger={() => void charger()} />
       </section>
     );
   }
-  const { liste, lignes } = etat.data;
-  const poserListe = (l: ListeOfficielle) => setEtat({ phase: 'ok', data: { ...etat.data, liste: l } });
-  const poserLignes = (ls: LigneListe[]) => setEtat({ phase: 'ok', data: { ...etat.data, lignes: ls, compte: ls.length } });
+  const lignes = etat.phase === 'ok' ? etat.data.lignes : null;
+  const compte = etat.phase === 'ok' ? etat.data.compte : null;
+  const tronque = etat.phase === 'ok' && Boolean(etat.data.tronque) && lignes !== null && compte !== null && compte > lignes.length;
 
   return (
     <>
@@ -399,20 +441,31 @@ export function ListeDetail({ surRefus }: { surRefus: Refus }) {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="titre-lignes" className="text-17 font-semibold">
-              Lignes · {lignes.length}
+              Lignes{compte !== null ? ` · ${nombre(compte)}` : ''}
               {qEnvoye ? ` pour « ${qEnvoye} »` : ''}
             </h2>
             <p className="muet">Modifier ou retirer une ligne s’écrit au journal ; un retrait est doux (la ligne reste en base).</p>
           </div>
           {champRecherche}
         </div>
-        {lignes.length === 0 ? <p className="muet">{qEnvoye ? `Aucune ligne ne contient « ${qEnvoye} ».` : 'Cette liste n’a aucune ligne vivante.'}</p> : null}
-        <ul className="liste" role="list">
-          {lignes.map((l) => (
-            <LigneVue key={l.id} liste={liste} ligne={l} surRefus={surRefus} surModifie={(m) => poserLignes(lignes.map((x) => (x.id === m.id ? m : x)))} surRetire={() => poserLignes(lignes.filter((x) => x.id !== l.id))} />
-          ))}
-        </ul>
-        {ajout ? (
+        {lignes === null || compte === null ? (
+          <EtatNonLu etat={etat.phase === 'ok' ? { phase: 'chargement' } : etat} recharger={() => void charger()} />
+        ) : (
+          <>
+            {tronque ? (
+              <Bandeau ton="warn" role="status">
+                {nombre(lignes.length)} lignes affichées sur {nombre(compte)} : précisez la recherche pour voir les autres.
+              </Bandeau>
+            ) : null}
+            {lignes.length === 0 ? <p className="muet">{qEnvoye ? `Aucune ligne ne contient « ${qEnvoye} ».` : 'Cette liste n’a aucune ligne vivante.'}</p> : null}
+            <ul className="liste" role="list">
+              {lignes.map((l) => (
+                <LigneVue key={l.id} liste={liste} ligne={l} surRefus={surRefus} surModifie={(m) => poserLignes(lignes.map((x) => (x.id === m.id ? m : x)))} surRetire={() => poserLignes(lignes.filter((x) => x.id !== l.id))} />
+              ))}
+            </ul>
+          </>
+        )}
+        {lignes === null ? null : ajout ? (
           <FormulaireLigne
             cle={`ajout-${liste.id}`}
             titre="Ajouter une ligne"
@@ -626,7 +679,7 @@ function FormulaireLigne({ cle, initial, titre, libelleBouton, surAnnule, surRef
   const [reservee, setReservee] = useState(initial?.rubriqueReservee ?? false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
-  const corps: CorpsLigne = { rubrique, marque: marque.trim() || null, produitLibelle: produit.trim() || null, mention: mention.trim() || null, touteMarque, rubriqueReservee: reservee };
+  const corps: CorpsLigne = { rubrique, marque: marque.trim() || null, produitLibelle: produit.trim() || null, mention: mention.trim() || null, touteMarque, rubriqueReservee: reservee || rubriqueReservee(rubrique) };
   const souci = incoherenceLigne(corps);
 
   const envoyerFormulaire = async (e: FormEvent) => {
@@ -650,7 +703,18 @@ function FormulaireLigne({ cle, initial, titre, libelleBouton, surAnnule, surRef
   return (
     <form className="mt-2 grid gap-3 rounded-sm border border-border bg-surface-2 p-3 sm:grid-cols-2" onSubmit={envoyerFormulaire} aria-label={titre}>
       <p className="font-semibold sm:col-span-2">{titre}</p>
-      <Champ id={`rubrique-${cle}`} etiquette="Rubrique" required maxLength={200} value={rubrique} onChange={(e) => setRubrique(e.target.value)} />
+      <Champ
+        id={`rubrique-${cle}`}
+        etiquette="Rubrique"
+        required
+        maxLength={200}
+        value={rubrique}
+        onChange={(e) => {
+          // La case « Réservée » suit le texte de la rubrique (« VINS » la coche) ; elle reste cochable en plus.
+          setRubrique(e.target.value);
+          setReservee(rubriqueReservee(e.target.value));
+        }}
+      />
       <Champ id={`marque-${cle}`} etiquette="Marque" maxLength={200} value={marque} onChange={(e) => setMarque(e.target.value)} />
       <Champ id={`produit-${cle}`} etiquette="Produit (libellé)" maxLength={300} value={produit} onChange={(e) => setProduit(e.target.value)} />
       <Champ id={`mention-${cle}`} etiquette="Mention" maxLength={300} value={mention} onChange={(e) => setMention(e.target.value)} aide="« L », « (L) » ou « lait non surveillé » → lait non surveillé ; sinon un texte libre." />

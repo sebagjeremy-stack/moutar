@@ -25,6 +25,8 @@ export interface SourceAnalyse {
   format: FormatSource;
   texte: string | null;
   fichier: FichierRecu | null;
+  /** Le titre de l'édition, s'il est déjà saisi : une ligne du fichier qui lui est égale est un en-tête répété (bruit). */
+  titre?: string | null;
 }
 
 export interface ImportListe {
@@ -50,6 +52,32 @@ export type ChampsLigne = Partial<Omit<LigneListe, 'id' | 'listeId'>>;
 /** Les listes actives et leurs lignes sont gardées en mémoire ce temps-là (une carte ne relit pas 3 000 lignes à chaque fois). */
 const DUREE_CACHE_MS = 30_000;
 const TAILLE_LOT = 500;
+/** Un nom de fichier reçu en multipart : 300 caractères au plus, sans caractère de contrôle (il s'affiche et s'écrit au journal). */
+const LONGUEUR_MAX_NOM_FICHIER = 300;
+
+/** Pure : le nom d'un fichier reçu, borné et sans caractère de contrôle ; null s'il ne reste rien. */
+export function nomFichierSur(nom: string | null | undefined): string | null {
+  if (!nom) return null;
+  // eslint-disable-next-line no-control-regex
+  const propre = nom.replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, LONGUEUR_MAX_NOM_FICHIER);
+  return propre || null;
+}
+
+/** Pure : le drapeau « réservée » d'une ligne telle qu'elle s'écrit : celui reçu OU celui que la rubrique impose (« VINS » l'est toujours). */
+export function reserveeEffective(l: Pick<LigneAnalysee, 'rubrique' | 'rubriqueReservee'>): boolean {
+  return Boolean(l.rubriqueReservee) || rubriqueReservee(l.rubrique);
+}
+
+/** Pure : une violation d'unicité PostgreSQL (`23505`), telle que `pg` la lève (parfois enveloppée dans `cause`). */
+export function estViolationUnicite(e: unknown): boolean {
+  if (typeof e !== 'object' || e === null) return false;
+  const err = e as { code?: unknown; cause?: unknown };
+  if (err.code === '23505') return true;
+  return typeof err.cause === 'object' && err.cause !== null && (err.cause as { code?: unknown }).code === '23505';
+}
+
+/** Le verrou consultatif d'une liste par son code, pris dans la transaction qui l'écrit (import, activation) : deux imports du même code se suivent, le second voit le premier. */
+const verrouListe = (code: CodeListe) => sql`select pg_advisory_xact_lock(hashtext(${`liste:${code}`}))`;
 
 export function versListe(l: ListeDb, nombreLignes: number): ListeOfficielle {
   return {
@@ -109,8 +137,9 @@ export class ListesService {
     if (source.fichier) texte = await texteDuFichier(source.fichier);
     if (!texte.trim()) throw new ErreurMetier(400, 'texte_absent', 'Envoyez un fichier (PDF, texte, CSV) ou collez le texte de la liste.');
     const csv = source.format === 'csv' || (source.format === 'auto' && /\.csv$/i.test(source.fichier?.originalname ?? ''));
-    const resultat = csv ? analyserCsv(texte) : source.code === 'rav_wolff' ? analyserTexteRavWolff(texte) : analyserTexteConsistoire(texte);
-    return { ...resultat, fichierNom: source.fichier?.originalname ?? null };
+    const options = { titre: source.titre ?? null };
+    const resultat = csv ? analyserCsv(texte) : source.code === 'rav_wolff' ? analyserTexteRavWolff(texte, options) : analyserTexteConsistoire(texte, options);
+    return { ...resultat, fichierNom: nomFichierSur(source.fichier?.originalname) };
   }
 
   /** Toutes les listes (actives et anciennes, hors retirées), avec leur compte de lignes vivantes. */
@@ -134,74 +163,98 @@ export class ListesService {
   }
 
   /**
-   * Importe une édition : dans UNE transaction, l'ancienne liste active du même code passe `active = false` (elle reste
-   * lisible), la liste et ses lignes s'écrivent, le journal note `liste.import`. Aucune ligne → 400 `liste_vide` ; une
-   * ligne incohérente → 400 `ligne_invalide` (rien n'est écrit).
+   * Importe une édition : dans UNE transaction, sous le verrou de la liste (`liste:<code>`), l'ancienne liste active du
+   * même code passe `active = false` (elle reste lisible), la liste et ses lignes s'écrivent, le journal note
+   * `liste.import`. Aucune ligne → 400 `liste_vide` ; une ligne incohérente → 400 `ligne_invalide` (rien n'est écrit) ;
+   * `rubriqueReservee` est RECALCULÉ (drapeau reçu OU rubrique réservée) avant la vérification : « VINS » en « toute
+   * marque » est refusé même si l'écran a décoché la case. Deux imports concurrents du même code se suivent sous le
+   * verrou ; si l'index « une seule active par code » parle quand même (23505), 409 `import_concurrent`.
    */
   async importer(i: ImportListe, session: SessionLue): Promise<ListeOfficielle> {
     if (i.lignes.length === 0) throw new ErreurMetier(400, 'liste_vide', 'Aucune ligne à importer : vérifiez l’aperçu.');
-    i.lignes.forEach((l, index) => {
+    const lignes = i.lignes.map((l) => ({ ...l, rubriqueReservee: reserveeEffective(l) }));
+    lignes.forEach((l, index) => {
       const refus = verifierLigne(l);
       if (refus) throw new ErreurMetier(400, 'ligne_invalide', `Ligne ${index + 1} : ${refus}`, { index });
     });
-    const liste = await this.db.transaction(async (tx) => {
-      await tx
-        .update(listeOfficielle)
-        .set({ active: false })
-        .where(and(eq(listeOfficielle.code, i.code), eq(listeOfficielle.active, true), isNull(listeOfficielle.deletedAt)));
-      const [creee] = await tx
-        .insert(listeOfficielle)
-        .values({ code: i.code, titre: i.titre, publieLe: i.publieLe, valableJusquAu: i.valableJusquAu, fichierNom: i.fichierNom, noteSource: i.noteSource, active: true })
-        .returning();
-      for (let depart = 0; depart < i.lignes.length; depart += TAILLE_LOT) {
-        const lot = i.lignes.slice(depart, depart + TAILLE_LOT).map((l, k) => ({
-          listeId: creee.id,
-          rubrique: l.rubrique.trim(),
-          marque: l.marque,
-          produitLibelle: l.produitLibelle,
-          mention: codeMention(l.mention),
-          touteMarque: l.touteMarque,
-          rubriqueReservee: l.rubriqueReservee,
-          ordre: depart + k,
-          ...normesLigne(l),
-        }));
-        await tx.insert(ligneListe).values(lot);
-      }
-      await journaliserSur(tx, session.compteId, 'liste.import', creee.id, { code: i.code, titre: i.titre, nombreLignes: i.lignes.length, fichierNom: i.fichierNom, publieLe: i.publieLe, valableJusquAu: i.valableJusquAu });
-      return creee;
-    });
-    this.oublierCache();
-    return versListe(liste, i.lignes.length);
-  }
-
-  /** Titre, dates, note, activation (activer une liste désactive l'autre du même code, dans la même transaction) ; journalisé. */
-  async modifier(id: string, champs: ChampsListe, session: SessionLue): Promise<ListeOfficielle> {
-    const avant = await this.lire(id);
-    await this.db.transaction(async (tx) => {
-      if (champs.active === true) {
+    const fichierNom = nomFichierSur(i.fichierNom);
+    const liste = await this.sousVerrouUnicite(() =>
+      this.db.transaction(async (tx) => {
+        await tx.execute(verrouListe(i.code));
         await tx
           .update(listeOfficielle)
           .set({ active: false })
-          .where(and(eq(listeOfficielle.code, avant.code), eq(listeOfficielle.active, true), isNull(listeOfficielle.deletedAt)));
-      }
-      await tx
-        .update(listeOfficielle)
-        .set({
-          ...(champs.titre !== undefined ? { titre: champs.titre } : {}),
-          ...(champs.publieLe !== undefined ? { publieLe: champs.publieLe } : {}),
-          ...(champs.valableJusquAu !== undefined ? { valableJusquAu: champs.valableJusquAu } : {}),
-          ...(champs.noteSource !== undefined ? { noteSource: champs.noteSource } : {}),
-          ...(champs.active !== undefined ? { active: champs.active } : {}),
-        })
-        .where(eq(listeOfficielle.id, id));
-      await journaliserSur(tx, session.compteId, 'liste.modification', id, { code: avant.code, ...champs });
-    });
+          .where(and(eq(listeOfficielle.code, i.code), eq(listeOfficielle.active, true), isNull(listeOfficielle.deletedAt)));
+        const [creee] = await tx
+          .insert(listeOfficielle)
+          .values({ code: i.code, titre: i.titre, publieLe: i.publieLe, valableJusquAu: i.valableJusquAu, fichierNom, noteSource: i.noteSource, active: true })
+          .returning();
+        for (let depart = 0; depart < lignes.length; depart += TAILLE_LOT) {
+          const lot = lignes.slice(depart, depart + TAILLE_LOT).map((l, k) => ({
+            listeId: creee.id,
+            rubrique: l.rubrique.trim(),
+            marque: l.marque,
+            produitLibelle: l.produitLibelle,
+            mention: codeMention(l.mention),
+            touteMarque: l.touteMarque,
+            rubriqueReservee: l.rubriqueReservee,
+            ordre: depart + k,
+            ...normesLigne(l),
+          }));
+          await tx.insert(ligneListe).values(lot);
+        }
+        await journaliserSur(tx, session.compteId, 'liste.import', creee.id, { code: i.code, titre: i.titre, nombreLignes: lignes.length, fichierNom, publieLe: i.publieLe, valableJusquAu: i.valableJusquAu });
+        return creee;
+      }),
+    );
+    this.oublierCache();
+    return versListe(liste, lignes.length);
+  }
+
+  /** Une écriture qui bute sur l'index « une seule liste active par code » (23505) répond 409 `import_concurrent`, jamais une 500. */
+  private async sousVerrouUnicite<T>(ecrire: () => Promise<T>): Promise<T> {
+    try {
+      return await ecrire();
+    } catch (e) {
+      if (estViolationUnicite(e)) throw new ErreurMetier(409, 'import_concurrent', 'Un autre import ou une activation de cette liste vient d’aboutir : rechargez la page, puis recommencez.');
+      throw e;
+    }
+  }
+
+  /** Titre, dates, note, activation (activer une liste désactive l'autre du même code, dans la même transaction, sous le verrou de la liste) ; journalisé. */
+  async modifier(id: string, champs: ChampsListe, session: SessionLue): Promise<ListeOfficielle> {
+    const avant = await this.lire(id);
+    await this.sousVerrouUnicite(() =>
+      this.db.transaction(async (tx) => {
+        if (champs.active === true) {
+          await tx.execute(verrouListe(avant.code));
+          await tx
+            .update(listeOfficielle)
+            .set({ active: false })
+            .where(and(eq(listeOfficielle.code, avant.code), eq(listeOfficielle.active, true), isNull(listeOfficielle.deletedAt)));
+        }
+        await tx
+          .update(listeOfficielle)
+          .set({
+            ...(champs.titre !== undefined ? { titre: champs.titre } : {}),
+            ...(champs.publieLe !== undefined ? { publieLe: champs.publieLe } : {}),
+            ...(champs.valableJusquAu !== undefined ? { valableJusquAu: champs.valableJusquAu } : {}),
+            ...(champs.noteSource !== undefined ? { noteSource: champs.noteSource } : {}),
+            ...(champs.active !== undefined ? { active: champs.active } : {}),
+          })
+          .where(eq(listeOfficielle.id, id));
+        await journaliserSur(tx, session.compteId, 'liste.modification', id, { code: avant.code, ...champs });
+      }),
+    );
     this.oublierCache();
     return this.lire(id);
   }
 
-  /** Les lignes d'une liste (vivantes), dans l'ordre ; `q` filtre sur rubrique, marque et produit normalisés. */
-  async lignes(id: string, q: string | null, limite = 5000): Promise<{ liste: ListeOfficielle; compte: number; lignes: LigneListe[] }> {
+  /**
+   * Les lignes d'une liste (vivantes), dans l'ordre ; `q` filtre sur rubrique, marque et produit normalisés. `compte` est
+   * le COMPTE RÉEL en base (filtre compris) ; au-delà de `limite` lignes servies, `tronque: true` (l'écran le dit).
+   */
+  async lignes(id: string, q: string | null, limite = 5000): Promise<{ liste: ListeOfficielle; compte: number; lignes: LigneListe[]; tronque: boolean }> {
     const liste = await this.lire(id);
     const conditions = [eq(ligneListe.listeId, id), isNull(ligneListe.deletedAt)];
     for (const mot of normaliser(q).split(' ').filter(Boolean)) {
@@ -213,12 +266,21 @@ export class ListesService {
       .where(and(...conditions))
       .orderBy(asc(ligneListe.ordre))
       .limit(limite);
-    return { liste, compte: lignes.length, lignes: lignes.map(versLigne) };
+    let compte = lignes.length;
+    if (lignes.length >= limite) {
+      const [total] = await this.db
+        .select({ compte: sql<number>`count(*)::int` })
+        .from(ligneListe)
+        .where(and(...conditions));
+      compte = total?.compte ?? lignes.length;
+    }
+    return { liste, compte, lignes: lignes.map(versLigne), tronque: compte > lignes.length };
   }
 
-  /** Ajout manuel d'une ligne (à la fin) ; journalisé. */
-  async ajouterLigne(id: string, l: Omit<LigneAnalysee, 'ordre'>, session: SessionLue): Promise<LigneListe> {
+  /** Ajout manuel d'une ligne (à la fin) ; `rubriqueReservee` recalculé (reçu OU rubrique réservée) ; journalisé. */
+  async ajouterLigne(id: string, ligne: Omit<LigneAnalysee, 'ordre'>, session: SessionLue): Promise<LigneListe> {
     await this.lire(id);
+    const l = { ...ligne, rubriqueReservee: reserveeEffective(ligne) };
     const refus = verifierLigne(l);
     if (refus) throw new ErreurMetier(400, 'ligne_invalide', refus);
     const [{ max }] = await this.db.select({ max: sql<number>`coalesce(max(${ligneListe.ordre}), -1)::int` }).from(ligneListe).where(eq(ligneListe.listeId, id));
@@ -231,16 +293,21 @@ export class ListesService {
     return versLigne(creee);
   }
 
-  /** Correction d'une ligne ; `rubriqueReservee` se recalcule si la rubrique change sans qu'on l'ait dit ; journalisé. */
+  /**
+   * Correction d'une ligne ; `rubriqueReservee` = le drapeau reçu (sinon celui d'avant, oublié si la rubrique change) OU
+   * ce que la rubrique impose — renommer en « VINS » rend la ligne réservée, quoi qu'on envoie ; journalisé.
+   */
   async modifierLigne(id: string, ligneId: string, champs: ChampsLigne, session: SessionLue): Promise<LigneListe> {
     const avant = await this.ligneVivante(id, ligneId);
+    const rubrique = champs.rubrique ?? avant.rubrique;
+    const drapeau = champs.rubriqueReservee ?? (champs.rubrique !== undefined && champs.rubrique !== avant.rubrique ? false : avant.rubriqueReservee);
     const apres = {
-      rubrique: champs.rubrique ?? avant.rubrique,
+      rubrique,
       marque: champs.marque !== undefined ? champs.marque : avant.marque,
       produitLibelle: champs.produitLibelle !== undefined ? champs.produitLibelle : avant.produitLibelle,
       mention: champs.mention !== undefined ? codeMention(champs.mention) : avant.mention,
       touteMarque: champs.touteMarque ?? avant.touteMarque,
-      rubriqueReservee: champs.rubriqueReservee ?? (champs.rubrique !== undefined && champs.rubrique !== avant.rubrique ? rubriqueReservee(champs.rubrique) : avant.rubriqueReservee),
+      rubriqueReservee: reserveeEffective({ rubrique, rubriqueReservee: drapeau }),
       ordre: champs.ordre ?? avant.ordre,
     };
     const refus = verifierLigne(apres);

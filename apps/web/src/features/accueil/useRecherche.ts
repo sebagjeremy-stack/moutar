@@ -5,7 +5,9 @@ import { phraseErreur } from '../../lib/erreurs';
 
 /**
  * La recherche de l'accueil (lot 2) : dès 3 caractères, `GET /recherche?q=` après 300 ms sans frappe ; la requête
- * précédente est ANNULÉE quand une nouvelle part (un seul appel en vol) ; 13 chiffres → la fiche du produit, sans appel.
+ * précédente est ANNULÉE quand une nouvelle part (un seul appel en vol) ; 13 chiffres → la fiche du produit, sans appel ;
+ * 8 à 12 chiffres → aucun appel non plus (un code-barres en cours de frappe : l'écran dit « tapez les 13 chiffres, ou
+ * Entrée ») ; Entrée (`chercherMaintenant`) lance la recherche telle quelle, sans attendre l'anti-rebond.
  * Rien n'est gardé sur le téléphone (ni la saisie, ni les résultats).
  */
 export const DELAI_RECHERCHE = 300;
@@ -14,6 +16,8 @@ export const MIN_CARACTERES = 3;
 export type EtatRecherche =
   /** Moins de 3 caractères : rien à montrer. */
   | { phase: 'repos' }
+  /** 8 à 12 chiffres : un code-barres en cours de frappe, aucun appel (13 chiffres ouvrent la fiche, Entrée aussi). */
+  | { phase: 'code_incomplet'; chiffres: number }
   | { phase: 'recherche' }
   | { phase: 'resultats'; q: string; resultat: ResultatRecherche }
   /** Une réponse SANS résultat (jamais pendant le chargement ni sur un échec). */
@@ -26,10 +30,19 @@ export function estCodeBarres(saisie: string): string | null {
   return /^\d{13}$/.test(brut) ? brut : null;
 }
 
+/** Un code-barres en cours de frappe : 8 à 12 chiffres seulement (espaces tolérés) → leur nombre, sinon null. */
+export function codeIncomplet(saisie: string): number | null {
+  const brut = saisie.replace(/\s/g, '');
+  return /^\d{8,12}$/.test(brut) ? brut.length : null;
+}
+
 export function useRecherche(saisie: string, surCodeBarres: (ean: string) => void, delai: number = DELAI_RECHERCHE) {
   const [etat, setEtat] = useState<EtatRecherche>({ phase: 'repos' });
   const [essai, setEssai] = useState(0);
   const enVol = useRef<AbortController | null>(null);
+  const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saisieRef = useRef(saisie);
+  saisieRef.current = saisie;
   const surCodeBarresRef = useRef(surCodeBarres);
   surCodeBarresRef.current = surCodeBarres;
 
@@ -67,18 +80,40 @@ export function useRecherche(saisie: string, surCodeBarres: (ean: string) => voi
       surCodeBarresRef.current(ean);
       return;
     }
+    const chiffres = codeIncomplet(q);
+    if (chiffres !== null) {
+      annuler();
+      setEtat({ phase: 'code_incomplet', chiffres });
+      return;
+    }
     if (q.length < MIN_CARACTERES) {
       annuler();
       setEtat({ phase: 'repos' });
       return;
     }
-    const minuteur = setTimeout(() => void lancer(q), delai);
-    return () => clearTimeout(minuteur);
+    minuteur.current = setTimeout(() => {
+      minuteur.current = null;
+      void lancer(q);
+    }, delai);
+    return () => {
+      if (minuteur.current) clearTimeout(minuteur.current);
+      minuteur.current = null;
+    };
   }, [saisie, essai, delai, lancer, annuler]);
 
   // Au démontage : rien ne reste en vol.
   useEffect(() => annuler, [annuler]);
 
   const reessayer = useCallback(() => setEssai((n) => n + 1), []);
-  return { etat, reessayer };
+
+  /** Entrée : la recherche part tout de suite, telle quelle (l'anti-rebond en attente est oublié) ; sous 3 caractères, rien. */
+  const chercherMaintenant = useCallback(() => {
+    const q = saisieRef.current.trim();
+    if (estCodeBarres(q) || codeIncomplet(q) !== null || q.length < MIN_CARACTERES) return;
+    if (minuteur.current) clearTimeout(minuteur.current);
+    minuteur.current = null;
+    void lancer(q);
+  }, [lancer]);
+
+  return { etat, reessayer, chercherMaintenant };
 }

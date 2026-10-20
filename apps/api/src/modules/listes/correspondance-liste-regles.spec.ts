@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { correspondanceListe, correspondanceListes, listePerimee, type ListeActive } from './correspondance-liste-regles';
+import { correspondanceListe, correspondanceListes, listePerimee, motDeRubriqueEnTete, type ListeActive } from './correspondance-liste-regles';
 
 const ligne = (n: number, rubrique: string, marque: string | null, produitLibelle: string | null = null, extra: Partial<ListeActive['lignes'][number]> = {}) => ({
   id: `l${n}`,
@@ -25,7 +25,9 @@ const consistoire: ListeActive = {
     ligne(4, 'YAOURTS', null, null, { touteMarque: true }),
     ligne(5, 'CHARCUTERIE', 'Zelbo', null, { rubriqueReservee: true }),
     ligne(6, 'CONFISERIE', null, 'Nougat de Montélimar'),
-    ligne(7, 'PÂTES', null, null, { touteMarque: true, mention: 'lait_non_surveille' }),
+    ligne(7, 'CONFITURES', null, null, { touteMarque: true, mention: 'lait_non_surveille' }),
+    ligne(8, 'LAIT', null, null, { touteMarque: true }),
+    ligne(9, 'BISCUITS SECS', '15 -'),
   ],
 };
 
@@ -80,7 +82,20 @@ describe('correspondanceListe (niveau 2, règle pure)', () => {
     expect(s.ligne?.id).toBe('l4');
   });
   it('une rubrique « toute marque » porte sa mention', () => {
-    expect(correspondanceListe({ nom: 'Pâtes complètes', marque: 'Panzani' }, consistoire, AUJOURDHUI).mention).toBe('lait non surveillé');
+    expect(correspondanceListe({ nom: 'Confiture de fraises', marque: 'Andros' }, consistoire, AUJOURDHUI)).toMatchObject({ statut: 'cite_par_rubrique', mention: 'lait non surveillé', ligne: { id: 'l7' } });
+  });
+  it('« par rubrique » ne joue que sur les DEUX premiers mots du nom, hors mots génériques : « LAIT » ne cite pas « Chocolat au lait »', () => {
+    expect(correspondanceListe({ nom: 'Chocolat au lait', marque: 'Inconnue' }, consistoire, AUJOURDHUI).statut).toBe('non_cite');
+    expect(correspondanceListe({ nom: 'Lait demi-écrémé', marque: 'Inconnue' }, consistoire, AUJOURDHUI).statut).toBe('non_cite');
+    expect(correspondanceListe({ nom: 'Boisson au yaourt', marque: 'Inconnue' }, consistoire, AUJOURDHUI).statut).toBe('non_cite');
+    expect(correspondanceListe({ nom: 'Nature yaourt brassé', marque: 'Inconnue' }, consistoire, AUJOURDHUI).statut).toBe('cite_par_rubrique');
+    expect(motDeRubriqueEnTete('YAOURTS', 'Yaourt nature')).toBe('yaourt');
+    expect(motDeRubriqueEnTete('LAIT', 'Chocolat au lait')).toBeNull();
+    expect(motDeRubriqueEnTete('PÂTES À TARTINER', 'Pâte à tartiner noisettes')).toBeNull();
+    expect(motDeRubriqueEnTete('CONFITURES', 'Petit pot de confiture')).toBeNull();
+  });
+  it('une marque de liste sans lettre (« 15 - ») ne cite rien', () => {
+    expect(correspondanceListe({ nom: 'Biscuits 15 céréales', marque: '15' }, consistoire, AUJOURDHUI).statut).toBe('non_cite');
   });
   it('une rubrique réservée ne cite que ses marques nommées', () => {
     expect(correspondanceListe({ nom: 'Saucisson de bœuf', marque: 'Zelbo' }, consistoire, AUJOURDHUI).statut).toBe('cite');

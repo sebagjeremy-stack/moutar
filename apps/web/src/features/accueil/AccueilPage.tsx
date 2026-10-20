@@ -32,9 +32,10 @@ export function AccueilPage() {
     setSeuil(lireSeuilLocal());
   }, []);
 
-  // 13 chiffres tapés → la fiche, sans appel ; sinon les suggestions dès 3 caractères (anti-rebond, annulation : `useRecherche`).
+  // 13 chiffres tapés → la fiche, sans appel ; 8 à 12 chiffres → aucun appel (code en cours de frappe) ; sinon les
+  // suggestions dès 3 caractères (anti-rebond, annulation : `useRecherche`) ; Entrée lance la recherche telle quelle.
   const surCodeBarres = useCallback((ean: string) => navigate(`/produit/${ean}`), [navigate]);
-  const { etat, reessayer } = useRecherche(saisie, surCodeBarres);
+  const { etat, reessayer, chercherMaintenant } = useRecherche(saisie, surCodeBarres);
   // Dicter : le texte reconnu remplit le champ (les suggestions suivent), le champ s'ouvre et prend le focus.
   const [messageDictee, setMessageDictee] = useState<string | null>(null);
   const dictee = useDictee(
@@ -85,7 +86,13 @@ export function AccueilPage() {
     }
     // Entrée sur un code-barres plus court que 13 chiffres (EAN-8, 12, 14) : la fiche quand même.
     const ean = saisie.replace(/\s/g, '');
-    if (/^\d{8,14}$/.test(ean)) navigate(`/produit/${ean}`);
+    if (/^\d{8,14}$/.test(ean)) {
+      navigate(`/produit/${ean}`);
+      return;
+    }
+    // Entrée sans option choisie : la recherche part tout de suite, telle quelle.
+    setFerme(false);
+    chercherMaintenant();
   };
 
   const clavier = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -192,7 +199,7 @@ export function AccueilPage() {
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={listeOuverte}
-          aria-controls="suggestions"
+          aria-controls={listeOuverte ? 'suggestions' : undefined}
           aria-activedescendant={listeOuverte && actif >= 0 ? idOption(actif) : undefined}
           value={saisie}
           onChange={(e) => {

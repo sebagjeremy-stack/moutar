@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SousLigneListe } from '@moutar/shared-types';
-import { datesSousLigne, pastilleSousLigne, precisionSousLigne, SANS_LISTE } from './sous-lignes-regles';
+import { CITE_AUTRE_RUBRIQUE, citeAVerifier, datesSousLigne, pastilleSousLigne, precisionSousLigne, SANS_LISTE } from './sous-lignes-regles';
 
 const base: SousLigneListe = {
   listeId: 'l1',
@@ -22,11 +22,19 @@ describe('pastilleSousLigne : statut → ton + mot', () => {
   it('cité avec mention → vert « Cité · lait non surveillé »', () => {
     expect(pastilleSousLigne({ ...base, mention: 'lait non surveillé' })).toEqual({ ton: 'ok', mot: 'Cité · lait non surveillé' });
   });
-  it('cité, confiance faible → vert, « à vérifier » dans la pastille', () => {
-    expect(pastilleSousLigne({ ...base, confiance: 'faible' })).toEqual({ ton: 'ok', mot: 'Cité · à vérifier' });
-    expect(pastilleSousLigne({ ...base, confiance: 'faible', mention: 'lait non surveillé' }).mot).toBe('Cité · lait non surveillé · à vérifier');
+  it('cité, confiance faible → AMBRE « Cité dans une autre rubrique · à vérifier », jamais vert, la mention ne s’y ajoute pas', () => {
+    expect(pastilleSousLigne({ ...base, confiance: 'faible' })).toEqual({ ton: 'warn', mot: CITE_AUTRE_RUBRIQUE });
+    expect(pastilleSousLigne({ ...base, confiance: 'faible', mention: 'lait non surveillé' })).toEqual({ ton: 'warn', mot: 'Cité dans une autre rubrique · à vérifier' });
   });
-  it('cité par rubrique → vert « Cité par rubrique »', () => {
+  it('la forme « non_verifie » (celle de la ligne de niveau) se lit pareil : ambre, même mot', () => {
+    expect(pastilleSousLigne({ ...base, statut: 'non_verifie', confiance: 'faible' })).toEqual({ ton: 'warn', mot: CITE_AUTRE_RUBRIQUE });
+    expect(pastilleSousLigne({ ...base, statut: 'non_verifie', confiance: null })).toEqual({ ton: 'warn', mot: CITE_AUTRE_RUBRIQUE });
+    expect(citeAVerifier({ statut: 'non_verifie', confiance: null })).toBe(true);
+    expect(citeAVerifier({ statut: 'cite', confiance: 'faible' })).toBe(true);
+    expect(citeAVerifier({ statut: 'cite', confiance: 'forte' })).toBe(false);
+    expect(citeAVerifier({ statut: 'cite_par_rubrique', confiance: 'faible' })).toBe(false);
+  });
+  it('cité par rubrique → vert « Cité par rubrique » (la confiance faible y est la règle, la précision le dit)', () => {
     expect(pastilleSousLigne({ ...base, statut: 'cite_par_rubrique', confiance: 'faible' })).toEqual({ ton: 'ok', mot: 'Cité par rubrique' });
   });
   it('périmé → ambre « Cité · liste périmée », jamais vert, même avec mention', () => {
@@ -38,9 +46,11 @@ describe('pastilleSousLigne : statut → ton + mot', () => {
   it('aucune liste active → une ligne ambre avec son mot', () => {
     expect(SANS_LISTE).toEqual({ ton: 'warn', mot: 'Non vérifié · aucune liste importée' });
   });
-  it('aucune pastille sans mot, quel que soit le statut', () => {
-    for (const statut of ['cite', 'cite_par_rubrique', 'perime', 'non_cite'] as const) {
-      expect(pastilleSousLigne({ ...base, statut }).mot.trim().length).toBeGreaterThan(0);
+  it('aucune pastille sans mot, quel que soit le statut ; jamais « danger »', () => {
+    for (const statut of ['cite', 'cite_par_rubrique', 'perime', 'non_cite', 'non_verifie'] as const) {
+      const p = pastilleSousLigne({ ...base, statut });
+      expect(p.mot.trim().length).toBeGreaterThan(0);
+      expect(p.ton).not.toBe('danger');
     }
   });
 });
@@ -64,8 +74,9 @@ describe('precisionSousLigne', () => {
   it('marque seule, forte', () => {
     expect(precisionSousLigne(base)).toBe('La marque « Lu » est nommée sous la rubrique « BISCUITS SECS ».');
   });
-  it('marque seule, faible → invite à vérifier', () => {
+  it('marque seule, faible → invite à vérifier (les deux formes)', () => {
     expect(precisionSousLigne({ ...base, confiance: 'faible' })).toBe('La marque « Lu » est nommée sous la rubrique « BISCUITS SECS ». Vérifiez que ce produit en relève.');
+    expect(precisionSousLigne({ ...base, statut: 'non_verifie', confiance: null })).toBe('La marque « Lu » est nommée sous la rubrique « BISCUITS SECS ». Vérifiez que ce produit en relève.');
   });
   it('marque et produit', () => {
     expect(precisionSousLigne({ ...base, ligne: { id: 'y', rubrique: 'Biscuits', marque: 'Lu', produitLibelle: 'Petit Beurre' } })).toBe('« Lu — Petit Beurre » nommé sous la rubrique « Biscuits ».');

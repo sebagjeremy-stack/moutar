@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { estCodeBarres, useRecherche } from './useRecherche';
+import { codeIncomplet, estCodeBarres, useRecherche } from './useRecherche';
 
 /** Un `fetch` simulé : chaque appel note son adresse et son signal, et se résout quand le test le décide. */
 interface Appel {
@@ -120,9 +120,50 @@ describe('useRecherche', () => {
     expect(f.appels).toHaveLength(2);
   });
 
-  it('estCodeBarres : 13 chiffres seulement', () => {
+  it('8 à 12 chiffres → aucun appel, l’état dit « code incomplet » avec le nombre de chiffres', async () => {
+    const naviguer = vi.fn();
+    const { result, rerender } = renderHook(({ s }) => useRecherche(s, naviguer), { initialProps: { s: 'bis' } });
+    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(f.appels).toHaveLength(1);
+    rerender({ s: '3017 760000' });
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(f.fn).toHaveBeenCalledTimes(1);
+    expect(f.appels[0].signal.aborted).toBe(true);
+    expect(result.current.etat).toEqual({ phase: 'code_incomplet', chiffres: 10 });
+    expect(naviguer).not.toHaveBeenCalled();
+    // Entrée sur un code incomplet ne lance pas de recherche non plus (l'écran ouvre la fiche lui-même).
+    act(() => result.current.chercherMaintenant());
+    await act(async () => { vi.advanceTimersByTime(300); });
+    expect(f.fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('chercherMaintenant (Entrée) lance la recherche telle quelle, sans attendre, et oublie l’anti-rebond en attente', async () => {
+    const { result, rerender } = renderHook(({ s }) => useRecherche(s, () => undefined), { initialProps: { s: '' } });
+    rerender({ s: 'bisc' });
+    await act(async () => { vi.advanceTimersByTime(50); });
+    expect(f.fn).not.toHaveBeenCalled();
+    act(() => result.current.chercherMaintenant());
+    expect(f.fn).toHaveBeenCalledTimes(1);
+    expect(f.appels[0].url).toBe('/api/v1/recherche?q=bisc');
+    expect(result.current.etat.phase).toBe('recherche');
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(f.fn).toHaveBeenCalledTimes(1);
+    // Sous 3 caractères : rien.
+    rerender({ s: 'bi' });
+    act(() => result.current.chercherMaintenant());
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(f.fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('estCodeBarres : 13 chiffres seulement ; codeIncomplet : 8 à 12', () => {
     expect(estCodeBarres('3017760000001')).toBe('3017760000001');
     expect(estCodeBarres('301776000000')).toBeNull();
     expect(estCodeBarres('petit beurre')).toBeNull();
+    expect(codeIncomplet('30177600')).toBe(8);
+    expect(codeIncomplet('3017 7600 0000')).toBe(12);
+    expect(codeIncomplet('3017760')).toBeNull();
+    expect(codeIncomplet('3017760000001')).toBeNull();
+    expect(codeIncomplet('30177600000012')).toBeNull();
+    expect(codeIncomplet('lu 2024')).toBeNull();
   });
 });

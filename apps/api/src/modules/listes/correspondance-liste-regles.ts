@@ -1,15 +1,17 @@
 import type { CodeListe, LigneListe, SousLigneListe } from '@moutar/shared-types';
 import { MOTS_VIDES_RUBRIQUE, libelleMention } from '@moutar/shared-types/catalogues/rubriques-listes';
-import { contientMotsEntiers, normaliser, partagentUnMot } from '@moutar/shared-types/regles/normalisation';
+import { contientMotsEntiers, mots, normaliser, partagentUnMot, radical } from '@moutar/shared-types/regles/normalisation';
 
 /**
  * Règle PURE du niveau 2 (lot 2) : ce qu'UNE liste active dit d'un produit (nom, marque).
- * - `cite` : une ligne nomme la marque (mots entiers, normalisés : « Lu » ne se lit pas dans « Lutine ») — et, si la ligne
- *   nomme aussi un produit, ce libellé figure dans le nom —, ou une ligne sans marque nomme un produit qui figure dans le
- *   nom. Confiance FORTE quand la rubrique de la ligne se retrouve aussi dans le nom du produit (« BISCUITS » / « Biscuits
- *   petit beurre »), FAIBLE sinon (la marque est citée pour une autre famille de produits, peut-être) ;
- * - `cite_par_rubrique` : aucune marque nommée ne correspond, mais une rubrique « toute marque » partage un mot avec le nom
- *   du produit (« YAOURTS » / « Yaourt nature ») : toute marque y est autorisée — confiance faible, toujours ;
+ * - `cite` : une ligne nomme la marque (mots entiers, normalisés : « Lu » ne se lit pas dans « Lutine » ; une marque sans
+ *   lettre, « 15 », ne cite rien) — et, si la ligne nomme aussi un produit, ce libellé figure dans le nom —, ou une ligne
+ *   sans marque nomme un produit qui figure dans le nom. Confiance FORTE quand la rubrique de la ligne se retrouve aussi
+ *   dans le nom du produit (« BISCUITS » / « Biscuits petit beurre »), FAIBLE sinon (la marque est citée pour une autre
+ *   famille de produits, peut-être) ;
+ * - `cite_par_rubrique` : aucune marque nommée ne correspond, mais une rubrique « toute marque » partage un mot avec les
+ *   DEUX PREMIERS mots du nom du produit (« YAOURTS » / « Yaourt nature »), hors mots génériques (« LAIT » ne cite pas
+ *   « Chocolat au lait ») : toute marque y est autorisée — confiance faible, toujours ;
  * - `non_cite` sinon ;
  * - `perime` : cité, mais la validité de la liste est passée au jour `aujourdhui` (jour du centre, `AAAA-MM-JJ`).
  * La mention de la ligne (« lait non surveillé ») est portée en libellé humain. Moutar ne décide pas : il cite.
@@ -48,6 +50,34 @@ function rubriqueDansLeNom(ligne: LigneDeListe, nom: string): string | null {
   return partagentUnMot(ligne.rubrique, nom, MOTS_VIDES_RUBRIQUE);
 }
 
+/**
+ * Les mots trop génériques pour qu'une rubrique « toute marque » cite un produit par eux seuls : « LAIT » ne couvre pas
+ * « Chocolat au lait », « SUCRE » ne couvre pas « Pâte à sucre ». Normalisés (sans accent).
+ */
+export const MOTS_GENERIQUES: ReadonlySet<string> = new Set(['lait', 'chocolat', 'fruits', 'fruit', 'sucre', 'pate', 'pates', 'sauce', 'creme', 'nature', 'bio']);
+
+/**
+ * Pour une rubrique « toute marque » : le mot du nom du produit qui porte la rubrique, s'il est l'un de ses DEUX premiers
+ * mots et n'est pas générique (« YAOURTS » / « Yaourt nature » → « yaourt » ; « LAIT » / « Chocolat au lait » → null).
+ */
+export function motDeRubriqueEnTete(rubrique: string, nom: string): string | null {
+  const radicauxRubrique = new Set<string>();
+  for (const mot of mots(rubrique)) {
+    const r = radical(mot);
+    if (r.length < 3 || MOTS_VIDES_RUBRIQUE.has(r) || MOTS_VIDES_RUBRIQUE.has(mot) || MOTS_GENERIQUES.has(r) || MOTS_GENERIQUES.has(mot)) continue;
+    radicauxRubrique.add(r);
+  }
+  for (const mot of mots(nom).slice(0, 2)) {
+    const r = radical(mot);
+    if (MOTS_GENERIQUES.has(mot) || MOTS_GENERIQUES.has(r)) continue;
+    if (radicauxRubrique.has(r)) return mot;
+  }
+  return null;
+}
+
+/** Une marque de liste qui ne nomme rien (aucune lettre : « 15 », « 2024 ») ne cite jamais un produit. */
+const marqueNomme = (marque: string | null): marque is string => Boolean(marque) && /\p{L}/u.test(marque!);
+
 export function listePerimee(liste: Pick<ListeActive, 'valableJusquAu'>, aujourdhui: string): boolean {
   return Boolean(liste.valableJusquAu) && liste.valableJusquAu!.slice(0, 10) < aujourdhui.slice(0, 10);
 }
@@ -59,11 +89,12 @@ export function meilleureLigne(produit: ProduitACiter, lignes: ListeActive['lign
   const candidats: Candidate[] = [];
   for (const ligne of lignes) {
     if (ligne.touteMarque) {
-      const mot = rubriqueDansLeNom(ligne, nom);
+      const mot = motDeRubriqueEnTete(ligne.rubrique, nom);
       if (mot) candidats.push({ ligne, statut: 'cite_par_rubrique', confiance: 'faible', rang: 40, motRubrique: mot });
       continue;
     }
-    const marqueOk = ligne.marque ? contientMotsEntiers(texte, ligne.marque) : false;
+    const marque = marqueNomme(ligne.marque) ? ligne.marque : null;
+    const marqueOk = marque ? contientMotsEntiers(texte, marque) : false;
     const libelle = normaliser(ligne.produitLibelle);
     const libelleOk = libelle.length >= 4 && contientMotsEntiers(texte, libelle);
     const motRubrique = rubriqueDansLeNom(ligne, nom);

@@ -15,9 +15,10 @@ const PHRASES: Readonly<Record<string, string>> = {
   texte_absent: 'Choisissez un fichier ou collez le texte de la liste.',
   liste_vide: 'Aucune ligne à importer : l’analyse n’a rien lu, ou toutes les lignes ont été retirées.',
   ligne_invalide: 'Une ligne est incohérente (« toute marque » exclut marque et produit, jamais sous une rubrique réservée ; une ligne nomme une marque ou un produit).',
+  import_concurrent: 'Un autre import ou une activation de cette liste vient d’aboutir : rechargez la page, puis recommencez.',
   liste_inconnue: 'Cette liste n’existe pas (ou plus).',
   ligne_inconnue: 'Cette ligne n’existe pas (ou plus).',
-  trop_de_demandes: 'Trop de recherches, patientez une minute.',
+  trop_de_demandes: 'Trop de demandes en peu de temps : patientez avant de recommencer.',
   recherche_trop_courte: 'Tapez au moins 3 caractères.',
   // Lot 3 : lecture d'une photo (logo, ingrédients). Jamais « aucun » : une lecture qui échoue n'a rien lu.
   image_absente: 'Aucune image n’est partie : reprenez la photo.',
@@ -34,6 +35,12 @@ const PHRASES: Readonly<Record<string, string>> = {
   certification_absente: 'Aucune certification n’était retenue pour ce produit.',
   certificateur_desactive: 'Cet organisme est désactivé à la console : la certification n’est pas retenue.',
   certificateur_inconnu: 'Cet organisme n’est pas dans le catalogue.',
+  proposition_inconnue: 'La proposition a expiré : reprenez la photo.',
+  mentions_contradictoires: 'Un logo ne dit pas à la fois parvé, halavi ou lait non surveillé : gardez une seule de ces mentions.',
+  // Lot 5 : contributions.
+  date_invalide: 'Le jour de la source doit être un jour du calendrier (AAAA-MM-JJ), au plus tard aujourd’hui.',
+  pseudonyme_invalide: 'Un pseudonyme, pas votre nom ni votre e-mail : retirez le « @ ».',
+  preuve_refusee: 'Le lien de preuve doit être en https et pointer vers Facebook ou lesbonsplanscachers.fr.',
   // Lot 4 : dictée de secours (`POST /transcriptions`).
   audio_absent: 'Aucun enregistrement n’est parti : réessayez, ou tapez le nom.',
   type_audio_refuse: 'Ce format d’enregistrement n’est pas accepté : tapez le nom.',

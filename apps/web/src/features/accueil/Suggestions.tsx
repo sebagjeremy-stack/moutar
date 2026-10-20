@@ -28,6 +28,13 @@ export function libelleLigne(l: LigneTrouvee): string {
 
 export function Suggestions({ etat, options, actif, surChoix, surSurvol, reessayer }: { etat: EtatRecherche; options: Option[]; actif: number; surChoix: (o: Option) => void; surSurvol: (i: number) => void; reessayer: () => void }) {
   if (etat.phase === 'repos') return null;
+  if (etat.phase === 'code_incomplet') {
+    return (
+      <p className="muet" role="status" aria-live="polite">
+        {etat.chiffres} chiffres : tapez les 13 chiffres du code-barres (la fiche s’ouvre seule), ou Entrée pour l’ouvrir tel quel.
+      </p>
+    );
+  }
   if (etat.phase === 'recherche') {
     return (
       <p className="muet" role="status" aria-live="polite">
