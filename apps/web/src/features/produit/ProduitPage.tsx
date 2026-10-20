@@ -11,10 +11,13 @@ import { IconeChevron, IconeImage } from '../../components/Icones';
 import { Emoji } from '../../components/Emoji';
 import { Pastille } from '../../components/Pastille';
 import { PastilleNumero } from '../../components/PastilleNumero';
-import { envoyer, lire } from '../../lib/api';
+import { appel, envoyer, lire } from '../../lib/api';
+import { phraseErreur } from '../../lib/erreurs';
 import { formaterEan, formaterJour } from '../../lib/dates';
-import { lireSeuilLocal, noterDansHistorique } from '../../lib/stockage-local';
+import { noterDansHistorique } from '../../lib/historique';
+import { lireSeuilLocal } from '../../lib/stockage-local';
 import { IngredientsEnGras } from './IngredientsEnGras';
+import { Partager } from './Partager';
 import { datesSousLigne, pastilleSousLigne, precisionSousLigne, SANS_LISTE } from './sous-lignes-regles';
 
 /** La bordure de la synthèse, en toutes lettres pour Tailwind ; aucune pour « neutre ». */
@@ -83,10 +86,10 @@ export function ProduitPage() {
     );
   }
   if (etat.phase === 'inconnu') return <ProduitInconnu ean={ean} barre={barre} surCree={() => void charger()} />;
-  return <CarteProduitVue carte={etat.carte} barre={barre} />;
+  return <CarteProduitVue carte={etat.carte} barre={barre} surRelire={() => void charger()} />;
 }
 
-function CarteProduitVue({ carte, barre }: { carte: CarteProduit; barre: React.ReactNode }) {
+function CarteProduitVue({ carte, barre, surRelire }: { carte: CarteProduit; barre: React.ReactNode; surRelire: () => void }) {
   const { produit: p, synthese, lignes } = carte;
   const ingredients = p.ingredientsTexte;
   const codes = carte.analyse?.additifs.map((a) => a.code) ?? [];
@@ -134,9 +137,10 @@ function CarteProduitVue({ carte, barre }: { carte: CarteProduit; barre: React.R
             <BoutonLien to={`/produit/${p.ean ?? ''}/ingredients`} variante="primaire" bloc className="mt-3">
               Scanner les ingrédients
             </BoutonLien>
-            <p className="muet mt-2">Ingrédients déjà connus par Open Food Facts : l’analyse se fait sans photo. Sinon, saisissez le texte de l’étiquette (la photo arrive au lot 3).</p>
+            <p className="muet mt-2">Ingrédients déjà connus par Open Food Facts : l’analyse se fait sans photo. Sinon, photographiez l’étiquette : le texte lu se relit avant d’être analysé.</p>
           </>
         ) : null}
+        <Partager carte={carte} />
       </Carte>
 
       <Carte aria-labelledby="titre-niveaux">
@@ -147,7 +151,7 @@ function CarteProduitVue({ carte, barre }: { carte: CarteProduit; barre: React.R
         <p className="muet mb-1">Une ligne par source, avec sa date et sa validité.</p>
         <ol className="liste" role="list">
           {lignes.map((l) => (
-            <LigneNiveau key={l.niveau} ligne={l} ean={p.ean} tagsIgnores={l.niveau === 4 ? (carte.analyse?.tagsIgnores ?? 0) : 0} />
+            <LigneNiveau key={l.niveau} ligne={l} ean={p.ean} tagsIgnores={l.niveau === 4 ? (carte.analyse?.tagsIgnores ?? 0) : 0} surRelire={surRelire} />
           ))}
         </ol>
       </Carte>
@@ -175,11 +179,10 @@ function CarteProduitVue({ carte, barre }: { carte: CarteProduit; barre: React.R
 
 /** Ce que le niveau proposera plus tard : un texte muet, sans apparence de lien (rien à cliquer avant le lot). */
 const A_VENIR: Record<number, string> = {
-  1: 'Photographier le logo · bientôt (lot 3)',
   3: 'Proposer une contribution · bientôt (lot 5)',
 };
 
-function LigneNiveau({ ligne, ean, tagsIgnores }: { ligne: LigneCarte; ean: string | null; tagsIgnores: number }) {
+function LigneNiveau({ ligne, ean, tagsIgnores, surRelire }: { ligne: LigneCarte; ean: string | null; tagsIgnores: number; surRelire: () => void }) {
   const aVenir = A_VENIR[ligne.niveau];
   // Niveau 2 (lot 2) : une sous-ligne PAR liste officielle, chacune avec sa pastille, sa date et sa validité — la pastille
   // et le détail du niveau ne se répètent pas (une information n'est écrite qu'une fois par vue).
@@ -204,6 +207,7 @@ function LigneNiveau({ ligne, ean, tagsIgnores }: { ligne: LigneCarte; ean: stri
           {ligne.avertissement}
         </Bandeau>
       ) : null}
+      {ligne.niveau === 1 && ean ? <ActionsNiveau1 ligne={ligne} ean={ean} surRelire={surRelire} /> : null}
       {ligne.niveau === 4 && ligne.composition === null && ean ? (
         <Link to={`/produit/${ean}/ingredients`} className="lien ml-[42px]">
           Saisir les ingrédients
@@ -216,6 +220,63 @@ function LigneNiveau({ ligne, ean, tagsIgnores }: { ligne: LigneCarte; ean: stri
       ) : null}
       {aVenir ? <p className="muet ml-[42px] mt-[6px]">{aVenir}</p> : null}
     </li>
+  );
+}
+
+/**
+ * Niveau 1 (lot 3) : une certification existe dès que la ligne a une source (validée, ou validée puis organisme désactivé) ;
+ * elle se retire d'un clic confirmé EN PLACE (`DELETE`), et la carte se relit. Sinon, la photo du logo.
+ */
+function ActionsNiveau1({ ligne, ean, surRelire }: { ligne: LigneCarte; ean: string; surRelire: () => void }) {
+  const [confirmer, setConfirmer] = useState(false);
+  const [retrait, setRetrait] = useState<{ envoi: boolean; erreur: string | null }>({ envoi: false, erreur: null });
+  const certifiee = ligne.source !== null;
+
+  const retirer = async () => {
+    setRetrait({ envoi: true, erreur: null });
+    const r = await appel<{ ok: true }>(`/api/v1/produits/${encodeURIComponent(ean)}/certification`, { method: 'DELETE' });
+    if (!r.ok && r.code !== 'certification_absente') {
+      setRetrait({ envoi: false, erreur: phraseErreur(r) });
+      return;
+    }
+    surRelire();
+  };
+
+  if (!certifiee) {
+    return (
+      <Link to={`/scan?pour=logo&ean=${encodeURIComponent(ean)}`} className="lien ml-[42px]">
+        Photographier le logo
+      </Link>
+    );
+  }
+  if (confirmer) {
+    return (
+      <Bandeau ton="warn" role="alert" className="ml-[42px] mt-2">
+        <p className="font-semibold">Retirer cette certification ?</p>
+        <p>La ligne redevient « Aucun logo lu » ; vous pourrez reprendre une photo.</p>
+        {retrait.erreur ? <p className="mt-1">{retrait.erreur}</p> : null}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Bouton variante="primaire" disabled={retrait.envoi} onClick={() => void retirer()}>
+            {retrait.envoi ? 'Retrait…' : 'Oui, retirer'}
+          </Bouton>
+          <Bouton disabled={retrait.envoi} onClick={() => setConfirmer(false)}>
+            Garder
+          </Bouton>
+        </div>
+      </Bandeau>
+    );
+  }
+  return (
+    <div className="ml-[42px] flex flex-wrap gap-x-4">
+      <button type="button" className="lien" onClick={() => setConfirmer(true)}>
+        Retirer
+      </button>
+      {ligne.statut !== 'cite' ? (
+        <Link to={`/scan?pour=logo&ean=${encodeURIComponent(ean)}`} className="lien">
+          Photographier le logo
+        </Link>
+      ) : null}
+    </div>
   );
 }
 

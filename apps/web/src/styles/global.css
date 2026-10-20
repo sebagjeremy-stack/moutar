@@ -418,6 +418,24 @@
   details.carte[open] > summary .chevron {
     transform: rotate(180deg);
   }
+  /* « À l'écoute… » (dictée) : trois points qui battent, seulement si le mouvement est permis ; le mot est écrit. */
+  .ecoute {
+    @apply inline-flex items-baseline;
+  }
+  .ecoute-points > span {
+    @apply inline-block;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .ecoute-points > span {
+      animation: battement 1.2s var(--courbe) infinite;
+    }
+    .ecoute-points > span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .ecoute-points > span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+  }
   /* Le viseur du scan : quatre coins arrondis, chacun d'un accent (décoration ; le texte dit quoi faire). */
   .viseur-coin {
     @apply absolute h-7 w-7 border-[4px] border-transparent;
@@ -463,6 +481,19 @@
   }
   .choix-seuil-4 {
     @apply bg-accent-4-soft;
+  }
+}
+
+@keyframes battement {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
   }
 }
 

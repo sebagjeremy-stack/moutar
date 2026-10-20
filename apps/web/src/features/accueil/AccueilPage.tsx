@@ -9,8 +9,10 @@ import { Ecran, Marque } from '../../components/Ecran';
 import { IconeAppareil, IconeCrayon, IconeHistorique, IconeInfo, IconeMicro } from '../../components/Icones';
 import { Pastille } from '../../components/Pastille';
 import { quand } from '../../lib/dates';
-import { lireHistorique, lireSeuilLocal, type EntreeHistorique } from '../../lib/stockage-local';
+import { lireHistorique, type EntreeHistorique } from '../../lib/historique';
+import { lireSeuilLocal } from '../../lib/stockage-local';
 import { idOption, optionsDe, PanneauLigne, Suggestions, type Option } from './Suggestions';
+import { useDictee } from './useDictee';
 import { useRecherche } from './useRecherche';
 
 /** L'accueil de la maquette : Dicter (lot 4), Écrire (nom, marque ou code-barres : lot 2), Mon seuil, Derniers produits, le principe, le pied « Photographier ». */
@@ -33,6 +35,35 @@ export function AccueilPage() {
   // 13 chiffres tapés → la fiche, sans appel ; sinon les suggestions dès 3 caractères (anti-rebond, annulation : `useRecherche`).
   const surCodeBarres = useCallback((ean: string) => navigate(`/produit/${ean}`), [navigate]);
   const { etat, reessayer } = useRecherche(saisie, surCodeBarres);
+  // Dicter : le texte reconnu remplit le champ (les suggestions suivent), le champ s'ouvre et prend le focus.
+  const [messageDictee, setMessageDictee] = useState<string | null>(null);
+  const dictee = useDictee(
+    useCallback((texte: string) => {
+      setSaisie(texte);
+      setFerme(false);
+      setActif(-1);
+      setPanneau(null);
+      setOuvert(true);
+      setMessageDictee(null);
+      setTimeout(() => champ.current?.focus(), 0);
+    }, []),
+  );
+  const ecoute = dictee.etat.phase === 'ecoute';
+  const dicter = () => {
+    if (ecoute) {
+      dictee.arreter();
+      return;
+    }
+    if (dictee.etat.phase === 'indisponible') {
+      setMessageDictee(dictee.etat.message);
+      setOuvert(true);
+      setTimeout(() => champ.current?.focus(), 0);
+      return;
+    }
+    setMessageDictee(null);
+    dictee.demarrer();
+  };
+  const noteDictee = messageDictee ?? (dictee.etat.phase === 'echec' ? dictee.etat.message : dictee.etat.phase === 'envoi' ? 'Transcription…' : null);
   const options = ferme ? [] : optionsDe(etat);
   const listeOuverte = options.length > 0;
 
@@ -87,7 +118,7 @@ export function AccueilPage() {
       barre={
         <>
           <Marque />
-          <Link to="/" className="btn-icone" aria-label="Historique des produits vérifiés" aria-disabled="true" title="Écran complet au lot 4">
+          <Link to="/historique" className="btn-icone" aria-label="Historique des produits vérifiés">
             <IconeHistorique className="h-6 w-6" />
           </Link>
         </>
@@ -107,9 +138,20 @@ export function AccueilPage() {
 
       <div className="grid grid-cols-2 gap-[10px] pt-1">
         {/* Les deux voies secondaires : icône teintée d'un accent (décoration : le mot est à côté). */}
-        <Bouton className="min-h-[56px]" aria-disabled="true" title="La dictée arrive au lot 4" onClick={(e) => e.preventDefault()}>
-          <IconeMicro className="h-[22px] w-[22px] text-accent-3-hover" />
-          Dicter
+        <Bouton className={`min-h-[56px] ${ecoute ? 'border-primary bg-primary-soft text-primary-strong' : ''}`} aria-pressed={ecoute} disabled={dictee.etat.phase === 'envoi'} onClick={dicter}>
+          <IconeMicro className={`h-[22px] w-[22px] ${ecoute ? 'text-primary-strong' : 'text-accent-3-hover'}`} />
+          {ecoute ? (
+            <span className="ecoute">
+              À l’écoute
+              <span className="ecoute-points" aria-hidden="true">
+                <span>.</span>
+                <span>.</span>
+                <span>.</span>
+              </span>
+            </span>
+          ) : (
+            'Dicter'
+          )}
         </Bouton>
         <Bouton
           className={`min-h-[56px] ${ouvert ? 'border-primary bg-primary-soft text-primary-strong' : ''}`}
@@ -124,6 +166,16 @@ export function AccueilPage() {
           Écrire
         </Bouton>
       </div>
+
+      {ecoute ? (
+        <p className="text-center font-semibold" role="status">
+          Dites le nom du produit ou sa marque ; appuyez de nouveau pour arrêter.
+        </p>
+      ) : noteDictee ? (
+        <Bandeau ton="warn" role="status">
+          {noteDictee}
+        </Bandeau>
+      ) : null}
 
       <form id="recherche" role="search" hidden={!ouvert} className="flex flex-col gap-[6px]" onSubmit={chercher}>
         <label className="cache-visuel" htmlFor="champ-produit">

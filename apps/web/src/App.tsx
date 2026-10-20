@@ -9,6 +9,8 @@ const SeuilPage = differe(() => import('./features/seuil/SeuilPage'), 'SeuilPage
 const ScanPage = differe(() => import('./features/scan/ScanPage'), 'ScanPage');
 const ProduitPage = differe(() => import('./features/produit/ProduitPage'), 'ProduitPage');
 const IngredientsPage = differe(() => import('./features/produit/IngredientsPage'), 'IngredientsPage');
+const LogoPage = differe(() => import('./features/certification/LogoPage'), 'LogoPage');
+const HistoriquePage = differe(() => import('./features/historique/HistoriquePage'), 'HistoriquePage');
 const AdminPage = differe(() => import('./features/admin/AdminPage'), 'AdminPage');
 
 function Attente() {
@@ -30,6 +32,8 @@ export function App() {
         <Route path="/scan" element={<ScanPage />} />
         <Route path="/produit/:ean" element={<ProduitPage />} />
         <Route path="/produit/:ean/ingredients" element={<IngredientsPage />} />
+        <Route path="/produit/:ean/logo" element={<LogoPage />} />
+        <Route path="/historique" element={<HistoriquePage />} />
         <Route path="/admin/*" element={<AdminPage />} />
         <Route
           path="*"
