@@ -25,6 +25,12 @@ Avertissement affiché au niveau 4 : la composition seule ne garantit rien (équ
 ## 4. Sortie : la carte produit
 Nom, marque, photo OFF. Puis 4 lignes, une par niveau : « Oui (source, date) » / « Non » / « Non vérifié » — jamais un verdict unique par la seule couleur, le mot s'écrit à côté. Bandeau de validité (liste périmée = ambre). Historique des scans gardé sur le téléphone seulement.
 
+**Quand une source ne répond pas (20/10/2026).** Le code-barres est la voie principale : l'EAN, lu en local dans le navigateur, identifie le produit (nom, marque, photo, ingrédients) par Open Food Facts. Si le niveau 1 n'a lu aucun logo et que le niveau 2 répond « non cité », la carte propose en ACTION PRINCIPALE « Scanner les ingrédients » :
+- ingrédients déjà connus par Open Food Facts → l'analyse des additifs se fait tout de suite, sans photo ;
+- ingrédients absents, ou fiche ancienne → photo de l'étiquette, OCR, texte relu et validé d'un clic par l'utilisateur, puis croisement par le CODE avec la table d'additifs ;
+- le résultat reste au niveau 4, avec son avertissement : « sur composition » n'est jamais un vert.
+Un produit absent d'Open Food Facts se crée à la main (nom, marque) ou par la photo des ingrédients ; l'EAN est gardé pour la prochaine fois.
+
 ## 5. Stack (celle de Kora, reprise)
 PWA React + Vite + Tailwind (design system de Kora réutilisé, sobriété), API NestJS + PostgreSQL + Drizzle, moteur IA = OVHcloud AI Endpoints (vision pour le logo, OCR). Hébergement simple (OVH VPS ou Vercel + Postgres managé) : pas de HDS. Catalogues (certificateurs, additifs) EN CODE et testés.
 

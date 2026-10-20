@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moutar — accueil</title>
+<link rel="stylesheet" href="moutar.css">
+<style>
+  /* Règles locales à l'accueil — jetons seulement, jamais une couleur en dur. */
+  .barre .marque { flex: 1; }
+  .btn svg { width: 22px; height: 22px; flex: none; }
+  .btn-grand svg { width: 28px; height: 28px; }
+
+  .secondaires { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding-top: 4px; }
+  .secondaires .btn { min-height: 56px; }
+  .secondaires .btn[aria-expanded="true"] { border-color: var(--primary); color: var(--primary-strong); background: var(--primary-soft); }
+
+  .recherche { display: flex; flex-direction: column; gap: 6px; }
+  .recherche label { font-weight: 600; }
+  .recherche[hidden] { display: none; }
+  .recherche .aide { margin: 0; }
+
+  .seuil .valeur { margin: 0; font-weight: 600; }
+  .seuil .niveaux { margin: 4px 0 0; }
+
+  .carte .entete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .carte .entete h2 { margin-bottom: 8px; }
+  .carte .entete .lien { text-decoration: none; }
+  .carte .entete .lien:hover { text-decoration: underline; }
+  .carte .note { margin: 0 0 4px; }
+
+  /* Ligne de produit : la pastille passe SOUS le nom quand la largeur manque (jamais le nom cassé). */
+  .produits { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: var(--tap); color: inherit; text-decoration: none; }
+  .produits .texte { flex: 1 1 auto; min-width: 0; }
+  .produits .nom { margin: 0; font-weight: 600; }
+  .produits .marque-produit { margin: 0; }
+  .produits .pastille { flex: 0 1 auto; max-width: 100%; }
+  .produits:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+  .bandeau-info { display: flex; gap: 10px; align-items: flex-start; margin-top: 4px; }
+  .bandeau-info svg { width: 20px; height: 20px; flex: none; margin-top: 1px; }
+  .credit { margin: 0; text-align: center; }
+
+  /* Pied collant : l'action principale sous le pouce droit, pleine largeur, son sous-texte en petit au-dessus. */
+  .pied { flex-direction: column; gap: 8px; }
+  .pied .sous-texte { margin: 0; text-align: center; padding: 0 8px; }
+</style>
+</head>
+<body>
+<div class="ecran">
+
+  <header class="barre">
+    <span class="marque"></span>
+    <!-- écran non maquetté (lot 4) -->
+    <a class="btn btn-icone" href="#" aria-label="Historique des produits vérifiés">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 12a9 9 0 1 0 3-6.7"/>
+        <path d="M3 4v5h5"/>
+        <path d="M12 7v5l3 2"/>
+      </svg>
+    </a>
+  </header>
+
+  <main class="contenu">
+    <h1 class="cache-visuel">Vérifier un produit</h1>
+
+    <!-- 1. Les deux voies secondaires (l'action principale, Photographier, est dans le pied collant) -->
+    <div class="secondaires">
+      <!-- écran non maquetté (lot 4) -->
+      <a class="btn" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3"/>
+          <path d="M5 11a7 7 0 0 0 14 0"/>
+          <path d="M12 18v3"/>
+        </svg>
+        Dicter
+      </a>
+      <button class="btn" type="button" id="bouton-ecrire" aria-expanded="true" aria-controls="recherche">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17z"/>
+          <path d="M13.5 6.5l3 3"/>
+        </svg>
+        Écrire
+      </button>
+    </div>
+
+    <form class="recherche" id="recherche" action="#" role="search">
+      <label class="cache-visuel" for="champ-produit">Nom du produit ou marque</label>
+      <input class="champ" id="champ-produit" type="search" placeholder="Nom du produit, marque…" autocomplete="off" aria-describedby="aide-produit">
+      <p class="muet aide" id="aide-produit">Suggestions dès 3 caractères.</p>
+    </form>
+
+    <!-- 2. Le seuil de l'utilisateur -->
+    <section class="carte" aria-labelledby="titre-seuil">
+      <div class="entete">
+        <h2 id="titre-seuil">Mon seuil</h2>
+        <!-- écran non maquetté (lot 4) -->
+        <a class="lien" href="#" aria-label="Modifier mon seuil">Modifier</a>
+      </div>
+      <div class="seuil">
+        <p class="valeur">Je m'arrête au niveau 2 · Liste officielle</p>
+        <p class="muet niveaux">Niveaux : 1 Certifié · 2 Liste officielle · 3 Communautaire · 4 Sur composition.</p>
+      </div>
+    </section>
+
+    <!-- 3. Les derniers produits, gardés sur le téléphone seulement -->
+    <section class="carte" aria-labelledby="titre-derniers">
+      <div class="entete">
+        <h2 id="titre-derniers">Derniers produits</h2>
+        <!-- écran non maquetté (lot 4) -->
+        <a class="lien" href="#">Tout voir</a>
+      </div>
+      <p class="muet note">Gardés sur ce téléphone seulement.</p>
+      <ul class="liste" role="list">
+        <li>
+          <a class="produits" href="carte-produit.html">
+            <div class="texte">
+              <p class="nom">Biscuits au chocolat</p>
+              <p class="muet marque-produit">Biscuiterie du Pré · hier</p>
+            </div>
+            <span class="pastille pastille-ok">Permis · niveau 2</span>
+          </a>
+        </li>
+        <li>
+          <a class="produits" href="carte-produit.html#non-cite">
+            <div class="texte">
+              <p class="nom">Yaourts nature ×4</p>
+              <p class="muet marque-produit">Ferme des Quatre Vents · hier</p>
+            </div>
+            <span class="pastille pastille-warn">Non vérifié</span>
+          </a>
+        </li>
+        <li>
+          <a class="produits" href="carte-produit.html">
+            <div class="texte">
+              <p class="nom">Bonbons gélifiés</p>
+              <p class="muet marque-produit">Confiserie Lutine · lundi</p>
+            </div>
+            <span class="pastille pastille-danger">Non cacher</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <!-- 4. Le principe, rappelé une fois -->
+    <p class="bandeau bandeau-info" role="note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 11v5"/>
+        <path d="M12 8h.01"/>
+      </svg>
+      <span>Cette application ne décide pas, elle cite : chaque réponse porte sa source et sa date.</span>
+    </p>
+
+    <p class="muet credit">Open Food Facts · ODbL</p>
+  </main>
+
+  <!-- à valider : bouton principal en pied collant (relecture du 20/10/2026) -->
+  <footer class="pied">
+    <p class="muet sous-texte">Code-barres, logo de certification ou liste d'ingrédients : une seule photo suffit.</p>
+    <!-- écran non maquetté (lot 1 : code-barres ; lot 3 : logo) -->
+    <a class="btn btn-primaire btn-grand btn-bloc" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/>
+        <circle cx="12" cy="13" r="3.5"/>
+      </svg>
+      Photographier le produit
+    </a>
+  </footer>
+
+</div>
+
+<script>
+  // Montrer ou masquer le champ texte sous « Écrire » (inoffensif : la page vit sans).
+  (function () {
+    var bouton = document.getElementById('bouton-ecrire');
+    var zone = document.getElementById('recherche');
+    if (!bouton || !zone) return;
+    bouton.addEventListener('click', function () {
+      var ouvert = bouton.getAttribute('aria-expanded') === 'true';
+      bouton.setAttribute('aria-expanded', ouvert ? 'false' : 'true');
+      zone.hidden = ouvert;
+      if (!ouvert) document.getElementById('champ-produit').focus();
+    });
+  })();
+</script>
+</body>
+</html>

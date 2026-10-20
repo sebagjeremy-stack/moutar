@@ -5,14 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Moutar — maquettes</title>
 <link rel="stylesheet" href="moutar.css">
+<style>
+  .contenu h1 { margin: 4px 0 0; font-size: var(--fs-title); }
+  .contenu > a.carte { color: inherit; text-decoration: none; }
+  .contenu > a.carte:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+</style>
 </head>
 <body>
 <div class="ecran">
   <header class="barre"><span class="marque"></span><span class="muet">maquettes · lot 0</span></header>
   <main class="contenu">
+    <h1>Maquettes</h1>
     <p class="muet">Maquettes HTML statiques, mobile d'abord. À ouvrir sur un téléphone ou en largeur réduite.</p>
     <a class="carte" href="accueil.html"><h2>1 · Accueil : photographier, dicter, écrire</h2><p class="muet">L'écran d'entrée : une action principale, le pouce droit.</p></a>
     <a class="carte" href="carte-produit.html"><h2>2 · Carte produit : les quatre niveaux</h2><p class="muet">Le résultat : une ligne par source, avec date et validité ; le seuil de l'utilisateur.</p></a>
+    <a class="carte" href="carte-produit.html#non-cite"><h2>2 bis · Carte produit : produit non cité sur les listes</h2><p class="muet">Variante : aucun logo, aucune liste ; l'action principale devient « Scanner les ingrédients ».</p></a>
+    <a class="carte" href="carte-produit.html#perimee"><h2>2 ter · Carte produit : liste périmée</h2><p class="muet">Variante : la source citée est expirée, en ambre, jamais en vert.</p></a>
   </main>
 </div>
 </body>

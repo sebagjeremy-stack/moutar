@@ -1,12 +1,13 @@
 /* Moutar — jetons de design des maquettes (une seule source ; jamais une couleur en dur dans les pages). */
 :root {
+  color-scheme: light dark;
   --app-name: "Moutar";
   /* Surfaces et texte */
   --bg: #f4f5f7;
   --surface: #ffffff;
   --surface-2: #eef0f3;
   --text: #15181d;
-  --muted: #5b6370;        /* 4.6:1 sur --surface */
+  --muted: #5b6370;        /* 6:1 sur --surface */
   --border: #d5d9e0;
   --input: #8d95a3;         /* bordure de champ ≥ 3:1 */
   /* Accent (marque) */
@@ -15,7 +16,7 @@
   --on-primary: #ffffff;
   --primary-soft: #e7ebfb;
   /* Sémantique — le mot s'écrit toujours à côté de la couleur */
-  --ok: #1b7f4c;            /* permis selon la source */
+  --ok: #187445;            /* permis selon la source — ≥ 4,5:1 sur --ok-soft */
   --ok-soft: #e3f3ea;
   --warn: #9a5b00;          /* non vérifié, périmé, en attente */
   --warn-soft: #fff1d6;
@@ -29,7 +30,8 @@
   --shadow: 0 1px 2px rgba(21, 24, 29, .06), 0 4px 12px rgba(21, 24, 29, .06);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --fs-body: 16px;          /* jamais moins sur mobile */
-  --fs-small: 14px;
+  --fs-note: 15px;          /* bandeaux */
+  --fs-small: 14px;         /* métadonnées seulement */
   --fs-title: 22px;
   --tap: 48px;              /* cible tactile minimale */
   --gutter: 16px;
@@ -63,30 +65,44 @@ body {
 /* Cartes */
 .carte { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px var(--gutter); }
 .carte h2, .carte h3 { margin: 0 0 6px; font-size: 17px; }
+/* Texte : .detail porte l'information principale (source · date · validité) ; .muet, les métadonnées seulement. */
+.detail { color: var(--text); font-size: var(--fs-body); }
 .muet { color: var(--muted); font-size: var(--fs-small); }
 /* Boutons */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--tap); padding: 0 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--tap); padding: 0 18px; border-radius: 999px; border: 1px solid var(--input); background: var(--surface); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; }
 .btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 .btn-primaire { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .btn-primaire:hover { background: var(--primary-strong); }
 .btn-bloc { width: 100%; }
 .btn-grand { min-height: 64px; font-size: 18px; }
+/* Bouton icône (barre haute) : un cercle de 48 px, toujours avec un aria-label. */
+.btn-icone { display: inline-flex; align-items: center; justify-content: center; width: var(--tap); min-width: var(--tap); height: var(--tap); padding: 0; border-radius: 50%; border: 1px solid var(--input); background: var(--surface); color: var(--text); font: inherit; cursor: pointer; text-decoration: none; }
+.btn-icone:hover { background: var(--surface-2); }
+.btn-icone:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.btn-icone svg { width: 24px; height: 24px; flex: none; }
+/* Lien d'action dans une carte : souligné (jamais par la seule couleur), cible de 48 px. */
+.lien { display: inline-flex; align-items: center; min-height: var(--tap); color: var(--primary-strong); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.lien:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; border-radius: var(--radius-sm); }
 /* Champs */
 .champ { width: 100%; min-height: var(--tap); padding: 10px 14px; border: 1px solid var(--input); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; }
 .champ::placeholder { color: var(--muted); }
 .champ:focus-visible { outline: 3px solid var(--primary); outline-offset: 1px; }
 /* Pastilles de statut — le libellé est OBLIGATOIRE dans la pastille */
 .pastille { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-small); font-weight: 600; line-height: 1.3; }
-.pastille::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pastille::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
 .pastille-ok { color: var(--ok); background: var(--ok-soft); }
 .pastille-warn { color: var(--warn); background: var(--warn-soft); }
 .pastille-danger { color: var(--danger); background: var(--danger-soft); }
 .pastille-neutre { color: var(--neutral); background: var(--neutral-soft); }
+/* Carte de synthèse : aucune bordure colorée par défaut ; un modificateur par verdict, le mot toujours écrit dans la pastille. */
+.synthese-ok { border: 2px solid var(--ok); }
+.synthese-warn { border: 2px solid var(--warn); }
+.synthese-danger { border: 2px solid var(--danger); }
 /* Bandeau d'avertissement (ambre : jamais rouge pour un simple « non vérifié ») */
-.bandeau { padding: 10px 14px; border-radius: var(--radius-sm); font-size: var(--fs-small); border: 1px solid transparent; }
+.bandeau { padding: 10px 14px; border-radius: var(--radius-sm); font-size: var(--fs-note); border: 1px solid transparent; }
 .bandeau-warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
 .bandeau-info { background: var(--primary-soft); color: var(--primary-strong); }
-/* Séparateur, listes */
+/* Séparateur, listes (les pages posent role="list" : list-style: none retire la sémantique dans certains lecteurs d'écran) */
 .liste { list-style: none; margin: 0; padding: 0; }
 .liste > li { padding: 10px 0; border-top: 1px solid var(--border); }
 .liste > li:first-child { border-top: 0; }
