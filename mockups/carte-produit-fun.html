@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moutar — carte produit (fun)</title>
+<link rel="stylesheet" href="moutar-fun.css">
+<style>
+  /* Règles locales à l'écran « carte produit » — jetons de moutar-fun.css uniquement. */
+  .barre .marque { flex: 1; justify-content: center; }
+
+  /* En-tête produit : vignette teintée lagon (décoration) */
+  .produit { display: flex; gap: 14px; align-items: flex-start; }
+  .vignette { flex: 0 0 76px; width: 76px; height: 76px; border-radius: 20px; background: var(--accent-3-soft); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--accent-3-hover); }
+  .vignette svg { width: 28px; height: 28px; }
+  .produit h1 { margin: 0 0 2px; font-size: 19px; line-height: 1.3; }
+  .produit .marque-produit { margin: 0; font-weight: 600; }
+  .produit .muet { margin: 2px 0 0; }
+
+  /* Synthèse (la bordure colorée vient des modificateurs .synthese-ok / -warn / -danger du CSS commun) */
+  .synthese .tete { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 8px; }
+  .synthese h2 { margin: 0; flex: 1 1 auto; }
+  .synthese p { margin: 0; }
+  .synthese .btn { margin-top: 12px; }
+  .synthese .sous-action { margin: 8px 0 0; }
+
+  /* Les quatre niveaux */
+  .intro { margin: 0 0 4px; }
+  .niveau { padding: 12px 0; }
+  .niveau-tete { display: flex; align-items: flex-start; gap: 10px; }
+  /* Le numéro du niveau : .pastille-num-1 … -4 de moutar-fun.css (un accent par niveau, DÉCORATION ; le statut reste dans la pastille sémantique à côté). */
+  .niveau-num { margin-top: -2px; }
+  /* Titre + pastille : la pastille se range à droite ; quand la largeur manque, elle passe SOUS le titre, alignée à gauche sur lui. */
+  .niveau-corps { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 28px; }
+  .niveau-titre { flex: 1 1 auto; font-weight: 700; font-family: var(--font-display); font-size: 17px; }
+  .niveau-corps .pastille { flex: 0 1 auto; max-width: 100%; }
+  .niveau-detail { margin: 6px 0 0 42px; }
+  .niveau .bandeau { margin: 8px 0 0 42px; }
+  .niveau .lien { margin-left: 42px; }
+
+  /* Niveau 2 : une sous-ligne par source, chacune avec sa pastille, sa date et sa validité */
+  .sources { margin: 6px 0 0 42px; }
+  .sources > li { padding: 8px 0; }
+  .source { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .source .detail { flex: 1 1 auto; min-width: 0; margin: 0; }
+  .source .pastille { flex: 0 1 auto; max-width: 100%; }
+  .sources .precision { margin: 4px 0 0; }
+
+  /* Ingrédients (repliés) */
+  details > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: var(--tap); margin: -14px calc(-1 * var(--gutter)); padding: 0 var(--gutter); border-radius: var(--radius); }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary:focus-visible { outline: 3px solid var(--primary); outline-offset: -3px; }
+  details > summary h2 { margin: 0; }
+  details > summary .chevron { width: 24px; height: 24px; color: var(--muted); flex: 0 0 auto; transition: transform var(--duree) var(--courbe); }
+  details[open] > summary .chevron { transform: rotate(180deg); }
+  details[open] > summary { margin-bottom: 0; }
+  .ingredients { margin: 10px 0 0; line-height: 1.55; }
+  .ingredients strong { font-weight: 700; }
+  .attribution { margin: 10px 0 0; }
+
+  /* Variantes (états montrés pour la revue) */
+  .titre-discret { margin: 10px 0 0; font-size: var(--fs-small); font-weight: 600; color: var(--muted); }
+  .variante { border-style: dashed; }
+  .variante .legende { margin: 8px 0 0; }
+
+  .pied .btn { flex: 1; padding: 0 10px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="ecran">
+  <header class="barre">
+    <a class="btn-icone" href="accueil.html" aria-label="Retour">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <span class="marque"></span>
+    <!-- écran non maquetté (lot 4) -->
+    <button class="btn-icone" type="button" aria-label="Partager">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg>
+    </button>
+  </header>
+
+  <main class="contenu">
+    <section class="produit" aria-labelledby="nom-produit">
+      <div class="vignette" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="8" r="1.5"/></svg>
+      </div>
+      <div>
+        <h1 id="nom-produit">Biscuits petit-déjeuner céréales &amp; chocolat</h1>
+        <p class="marque-produit">Marque générique</p>
+        <p class="muet">EAN 3 000 000 000 000</p>
+        <p class="muet">Fiche Open Food Facts · lue le 20/10/2026</p>
+      </div>
+    </section>
+
+    <section class="carte synthese synthese-ok" aria-labelledby="titre-synthese">
+      <div class="tete">
+        <h2 id="titre-synthese">Selon votre seuil : niveau 2 · Liste officielle</h2>
+        <span class="pastille pastille-ok">Permis · lait non surveillé</span>
+      </div>
+      <p>Fondé sur la liste du Rav Wolff 2026.</p>
+    </section>
+
+    <!-- Les dates de publication et de validité des listes sont FICTIVES (maquette). -->
+    <section class="carte" aria-labelledby="titre-niveaux">
+      <h2 id="titre-niveaux">Les quatre niveaux <span class="emoji" aria-hidden="true">🧭</span></h2>
+      <p class="muet intro">Une ligne par source, avec sa date et sa validité.</p>
+      <ol class="liste" role="list">
+        <li class="niveau">
+          <div class="niveau-tete">
+            <span class="niveau-num pastille-num pastille-num-1" aria-hidden="true">1</span>
+            <div class="niveau-corps">
+              <span class="niveau-titre"><span class="cache-visuel">Niveau 1 · </span>Certifié</span>
+              <span class="pastille pastille-neutre">Aucun logo lu</span>
+            </div>
+          </div>
+          <p class="detail niveau-detail">Aucune certification reconnue sur la photo. Vous pouvez en photographier le logo.</p>
+          <a class="lien" href="accueil.html">Photographier le logo</a>
+        </li>
+        <li class="niveau">
+          <div class="niveau-tete">
+            <span class="niveau-num pastille-num pastille-num-2" aria-hidden="true">2</span>
+            <div class="niveau-corps">
+              <span class="niveau-titre"><span class="cache-visuel">Niveau 2 · </span>Liste officielle</span>
+            </div>
+          </div>
+          <ul class="liste sources" role="list" aria-label="Sources du niveau 2">
+            <li>
+              <div class="source">
+                <p class="detail">Rav Wolff — liste 2026, publiée le 10/01/2026, valable jusqu'au 01/11/2026</p>
+                <span class="pastille pastille-ok">Cité · lait non surveillé</span>
+              </div>
+            </li>
+            <li>
+              <div class="source">
+                <p class="detail">Consistoire de Paris — Produits 2025-2026, publiée en juillet 2025, valable jusqu'à l'édition suivante</p>
+                <span class="pastille pastille-ok">Cité</span>
+              </div>
+              <p class="detail precision">Rubrique « Biscuits secs » sans marque nommée : toute marque autorisée.</p>
+            </li>
+          </ul>
+        </li>
+        <li class="niveau">
+          <div class="niveau-tete">
+            <span class="niveau-num pastille-num pastille-num-3" aria-hidden="true">3</span>
+            <div class="niveau-corps">
+              <span class="niveau-titre"><span class="cache-visuel">Niveau 3 · </span>Communautaire</span>
+              <span class="pastille pastille-warn">Non vérifié</span>
+            </div>
+          </div>
+          <p class="detail niveau-detail">Aucune contribution Les Bons Plans Cachères.</p>
+          <!-- écran non maquetté (lot 5) -->
+          <a class="lien" href="#">Proposer une contribution</a>
+        </li>
+        <li class="niveau">
+          <div class="niveau-tete">
+            <span class="niveau-num pastille-num pastille-num-4" aria-hidden="true">4</span>
+            <div class="niveau-corps">
+              <span class="niveau-titre"><span class="cache-visuel">Niveau 4 · </span>Sur composition</span>
+              <span class="pastille pastille-neutre">Aucun additif repéré · composition seule</span>
+            </div>
+          </div>
+          <p class="detail niveau-detail">Table d'additifs Moutar (ligne sourcée), lue le 20/10/2026 : 14 ingrédients, 2 additifs — E322 (lécithines, tournesol), E500 (carbonates de sodium).</p>
+          <div class="bandeau bandeau-warn" role="note">La composition seule ne garantit rien : équipement partagé, arômes, lait non surveillé, vin, bichoul ne s'y lisent pas.</div>
+        </li>
+      </ol>
+    </section>
+
+    <details class="carte">
+      <summary>
+        <h2>Ingrédients <span class="emoji" aria-hidden="true">🧾</span></h2>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </summary>
+      <p class="ingredients">Céréales 52 % (farine de <em>blé</em>, flocons d'<em>avoine</em> 8 %, farine de riz), sucre, huile de tournesol, pépites de chocolat 10 % (pâte de cacao, beurre de cacao, émulsifiant : <strong>E322 (lécithines de tournesol)</strong>), sirop de glucose, poudre à lever : <strong>E500 (carbonates de sodium)</strong>, fibres de blé, sel, arômes, vitamine B1.</p>
+      <p class="muet attribution">Données Open Food Facts · ODbL</p>
+    </details>
+
+    <h2 class="titre-discret" id="non-cite">Variante : produit non cité sur les listes</h2>
+    <section class="carte synthese synthese-warn variante" aria-labelledby="titre-synthese-non-cite">
+      <div class="tete">
+        <h2 id="titre-synthese-non-cite">Selon votre seuil : niveau 2 · Liste officielle</h2>
+        <span class="pastille pastille-warn">Non vérifié</span>
+      </div>
+      <p>Aucun logo lu, aucune liste ne cite ce produit. Il reste la composition (niveau 4).</p>
+      <!-- écran non maquetté (lot 1) -->
+      <a class="btn btn-primaire btn-bloc" href="#">Scanner les ingrédients</a>
+      <p class="muet sous-action">Ingrédients déjà connus par Open Food Facts : l'analyse se fait sans photo. Sinon, photographiez l'étiquette, relisez le texte lu, validez d'un clic.</p>
+    </section>
+
+    <h2 class="titre-discret" id="perimee">Variante : liste périmée</h2>
+    <section class="carte variante" aria-label="Variante : la ligne 2 quand la liste est périmée">
+      <ol class="liste" role="list">
+        <li class="niveau">
+          <div class="niveau-tete">
+            <span class="niveau-num pastille-num pastille-num-2" aria-hidden="true">2</span>
+            <div class="niveau-corps">
+              <span class="niveau-titre"><span class="cache-visuel">Niveau 2 · </span>Liste officielle</span>
+            </div>
+          </div>
+          <ul class="liste sources" role="list" aria-label="Sources du niveau 2">
+            <li>
+              <div class="source">
+                <p class="detail">Rav Wolff — liste 2025, publiée le 12/01/2025, expirée le 01/11/2025</p>
+                <span class="pastille pastille-warn">Cité · liste périmée</span>
+              </div>
+              <p class="detail precision">Attendre la liste 2026.</p>
+            </li>
+          </ul>
+        </li>
+      </ol>
+      <p class="muet legende">Une source périmée s'affiche en ambre, jamais en vert.</p>
+    </section>
+  </main>
+
+  <footer class="pied">
+    <!-- écran non maquetté (lot 5) -->
+    <a class="btn" href="#">Signaler une erreur</a>
+    <a class="btn btn-primaire" href="accueil.html">Nouveau produit</a>
+  </footer>
+</div>
+</body>
+</html>

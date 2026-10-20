@@ -1,0 +1,219 @@
+/* Moutar — jetons de design, direction FUN et COLORÉE (20/10/2026).
+   Remplace moutar.css dans les pages « -fun » : MÊMES noms de jetons et de classes (l'intégration Tailwind ne change que des valeurs),
+   PLUS quatre accents décoratifs (--accent-1 … --accent-4), leurs -soft et leurs -on, une ombre colorée, une police d'affichage ronde.
+   Une seule source : jamais une couleur en dur dans les pages.
+
+   Palette (clair) — rôle :
+     corail  #ff7a5c  --accent-1  : l'action chaleureuse (Photographier), la pastille du niveau 1
+     soleil  #ffc233  --accent-2  : le surligneur de la marque, la pastille du niveau 2
+     lagon   #2fc4d6  --accent-3  : la pastille du niveau 3, touches de fond
+     lavande #7b58d9  --accent-4 = --primary : liens, focus, bandeau d'info, pastille du niveau 4, bouton secondaire plein
+   Les SÉMANTIQUES sont inchangées et restent exclusives : --ok (vert : permis selon la source), --warn (ambre : non vérifié / périmé),
+   --danger (rouge : non cacher — RÉSERVÉ), --neutral (gris : non concerné). Aucun accent n'est vert, ambre ou rouge :
+   le corail est posé CLAIR, à texte sombre (un corail foncé devient brique et se confond avec le rouge réservé).
+
+   Contrastes WCAG calculés (scripts/contraste2.mjs, hors dépôt) — AA : 4,5:1 texte, 3:1 bordure et grand texte.
+   CLAIR                                                      SOMBRE
+     texte / surface            #1f1a2e / #ffffff  16,86        #f1ecf7 / #221c2e  14,20
+     texte / fond               #1f1a2e / #f6f1fb  15,17        #f1ecf7 / #16121f  15,86
+     muet / surface             #5e5772 / #ffffff   6,81        #b1a9c2 / #221c2e   7,32
+     muet / fond                #5e5772 / #f6f1fb   6,13        #b1a9c2 / #16121f   8,18
+     muet / surface-2           #5e5772 / #f1ecf8   5,87        #b1a9c2 / #2e2740   6,30
+     bordure de champ / surface #857c9c / #ffffff   3,92 (≥3)   #8a809e / #221c2e   4,45 (≥3)
+     bordure de champ / fond    #857c9c / #f6f1fb   3,52 (≥3)   #8a809e / #16121f   4,96 (≥3)
+     btn-primaire               #ffffff / #7b58d9   4,95        #16121f / #c3a9ff   9,15
+     btn-primaire survol        #ffffff / #5a3bb3   7,75        #16121f / #d6c4ff  11,57
+     lien (primary-strong)      #5a3bb3 / #ffffff   7,75        #d6c4ff / #221c2e  10,36
+     bandeau-info               #5a3bb3 / #ebe4fb   6,28        #d6c4ff / #332552   8,64
+     pastille-ok                #187445 / #e3f3ea   5,04        #6fd39a / #163424   7,39
+     pastille-warn              #9a5b00 / #fff1d6   4,86        #f3b955 / #3b2a0c   7,80
+     pastille-danger            #b3261e / #fbe5e3   5,42        #ff8a80 / #3f1a18   6,70
+     pastille-neutre            #5e5772 / #f1ecf8   5,87        #b1a9c2 / #2e2740   6,30
+     bordure synthese-ok        #187445 / #ffffff   5,80 (≥3)   #6fd39a / #221c2e   9,00 (≥3)
+     bordure synthese-warn      #9a5b00 / #ffffff   5,43 (≥3)   #f3b955 / #221c2e   9,33 (≥3)
+     bordure synthese-danger    #b3261e / #ffffff   6,54 (≥3)   #ff8a80 / #221c2e   7,22 (≥3)
+     accent-1 corail (texte dessus)  #1f1a2e / #ff7a5c  6,58 ; survol #f5674a 5,56   #16121f / #ff8a73  8,01 ; survol #ffa08e  9,36
+     accent-2 soleil (texte dessus)  #1f1a2e / #ffc233 10,45 ; survol #f5b41a 9,17   #16121f / #ffcc55 12,29 ; survol #ffd97a 13,55
+     accent-3 lagon  (texte dessus)  #1f1a2e / #2fc4d6  8,02 ; survol #1eb4c6 6,74   #16121f / #4fd3e3 10,31 ; survol #8ae4ee 12,64
+     accent-4 lavande (texte dessus) #ffffff / #7b58d9  4,95 ; survol #5a3bb3 7,75   #16121f / #c3a9ff  9,15 ; survol #d6c4ff 11,57
+     texte / accent-1-soft … accent-4-soft : 13,96 · 14,94 · 14,67 · 13,67        11,56 · 10,15 · 10,62 · 11,84
+     muet / accent-4-soft       #5e5772 / #ebe4fb   5,52        #b1a9c2 / #332552   6,10
+*/
+:root {
+  color-scheme: light dark;
+  --app-name: "Moutar";
+  /* Surfaces et texte (neutres teintés lavande, jamais crème) */
+  --bg: #f6f1fb;
+  --surface: #ffffff;
+  --surface-2: #f1ecf8;
+  --text: #1f1a2e;
+  --muted: #5e5772;        /* 6,81:1 sur --surface */
+  --border: #e1dbec;
+  --input: #857c9c;         /* bordure de champ 3,92:1 */
+  /* Accent principal (marque, liens, focus) = lavande */
+  --primary: #7b58d9;
+  --primary-strong: #5a3bb3;
+  --on-primary: #ffffff;
+  --primary-soft: #ebe4fb;
+  /* Accents décoratifs — jamais un sens : marque, boutons, fonds, numéros */
+  --accent-1: #ff7a5c;  --accent-1-hover: #f5674a;  --accent-1-soft: #ffe4dc;  --on-accent-1: #1f1a2e;   /* corail */
+  --accent-2: #ffc233;  --accent-2-hover: #f5b41a;  --accent-2-soft: #fff1c2;  --on-accent-2: #1f1a2e;   /* soleil */
+  --accent-3: #2fc4d6;  --accent-3-hover: #1eb4c6;  --accent-3-soft: #d6f5f8;  --on-accent-3: #1f1a2e;   /* lagon */
+  --accent-4: #7b58d9;  --accent-4-hover: #5a3bb3;  --accent-4-soft: #ebe4fb;  --on-accent-4: #ffffff;   /* lavande */
+  /* Sémantique — INCHANGÉE, exclusive ; le mot s'écrit toujours à côté de la couleur */
+  --ok: #187445;            /* permis selon la source — 5,04:1 sur --ok-soft */
+  --ok-soft: #e3f3ea;
+  --warn: #9a5b00;          /* non vérifié, périmé, en attente — 4,86:1 */
+  --warn-soft: #fff1d6;
+  --danger: #b3261e;        /* non cacher, danger — RÉSERVÉ — 5,42:1 */
+  --danger-soft: #fbe5e3;
+  --neutral: #5e5772;       /* non concerné — 5,87:1 */
+  --neutral-soft: #f1ecf8;
+  /* Forme : plus rond, ombre colorée douce */
+  --radius: 22px;
+  --radius-sm: 14px;
+  --shadow-color: rgba(123, 88, 217, .14);          /* la lavande, voilée */
+  --shadow: 0 2px 6px var(--shadow-color), 0 10px 24px var(--shadow-color);
+  --shadow-accent-1: 0 8px 22px rgba(255, 122, 92, .38);
+  --shadow-primary: 0 8px 22px rgba(123, 88, 217, .35);
+  /* Décor de fond : deux halos (soleil, lagon) derrière l'écran — pas une information */
+  --halo-1: rgba(255, 194, 51, .22);
+  --halo-2: rgba(47, 196, 214, .18);
+  --surligneur: var(--accent-2-soft);             /* le trait soleil sous le nom de la marque */
+  --surligneur-haut: 58%;                         /* où le trait commence (surligneur large en clair) */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Police d'affichage ronde pour les titres : système seulement, AUCUN téléchargement */
+  --font-display: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", "Hiragino Maru Gothic ProN", var(--font);
+  --fs-body: 16px;          /* jamais moins sur mobile */
+  --fs-note: 15px;          /* bandeaux */
+  --fs-small: 14px;         /* métadonnées et pastilles seulement */
+  --fs-title: 24px;
+  --tap: 48px;              /* cible tactile minimale */
+  --gutter: 16px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Mouvement : court, sortie exponentielle ; tout est coupé par prefers-reduced-motion */
+  --duree: 180ms;
+  --duree-apparition: 320ms;
+  --courbe: cubic-bezier(.22, 1, .36, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16121f; --surface: #221c2e; --surface-2: #2e2740;
+    --text: #f1ecf7; --muted: #b1a9c2; --border: #3b334e; --input: #8a809e;
+    --primary: #c3a9ff; --primary-strong: #d6c4ff; --on-primary: #16121f; --primary-soft: #332552;
+    --accent-1: #ff8a73;  --accent-1-hover: #ffa08e;  --accent-1-soft: #4a2420;  --on-accent-1: #16121f;
+    --accent-2: #ffcc55;  --accent-2-hover: #ffd97a;  --accent-2-soft: #473508;  --on-accent-2: #16121f;
+    --accent-3: #4fd3e3;  --accent-3-hover: #8ae4ee;  --accent-3-soft: #0f3a41;  --on-accent-3: #16121f;
+    --accent-4: #c3a9ff;  --accent-4-hover: #d6c4ff;  --accent-4-soft: #332552;  --on-accent-4: #16121f;
+    --ok: #6fd39a; --ok-soft: #163424;
+    --warn: #f3b955; --warn-soft: #3b2a0c;
+    --danger: #ff8a80; --danger-soft: #3f1a18;
+    --neutral: #b1a9c2; --neutral-soft: #2e2740;
+    --shadow-color: rgba(0, 0, 0, .35);
+    --shadow: 0 2px 6px var(--shadow-color), 0 10px 24px var(--shadow-color);
+    --shadow-accent-1: 0 8px 22px rgba(255, 138, 115, .22);
+    --shadow-primary: 0 8px 22px rgba(195, 169, 255, .2);
+    --halo-1: rgba(255, 204, 85, .10);
+    --halo-2: rgba(79, 211, 227, .10);
+    --surligneur: var(--accent-2);                  /* en sombre, un voile de soleil devient ocre : un trait fin et vif */
+    --surligneur-haut: 84%;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: var(--fs-body)/1.45 var(--font);
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; letter-spacing: -.01em; }
+/* Cadre téléphone : la page EST l'écran ; deux halos de couleur dans le fond (background de l'élément : aucun débordement). */
+.ecran {
+  max-width: 430px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column;
+  background:
+    radial-gradient(420px 260px at 110% -40px, var(--halo-1), transparent 70%),
+    radial-gradient(360px 240px at -20% 30%, var(--halo-2), transparent 70%),
+    var(--bg);
+}
+.contenu { flex: 1; padding: var(--gutter); display: flex; flex-direction: column; gap: 12px; }
+/* Apparition des blocs de contenu : léger glissement, échelonné (coupé par prefers-reduced-motion en bas de feuille). */
+@keyframes apparition { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.contenu > * { animation: apparition var(--duree-apparition) var(--courbe) both; }
+.contenu > :nth-child(2) { animation-delay: 40ms; }
+.contenu > :nth-child(3) { animation-delay: 80ms; }
+.contenu > :nth-child(4) { animation-delay: 120ms; }
+.contenu > :nth-child(5) { animation-delay: 160ms; }
+.contenu > :nth-child(n + 6) { animation-delay: 200ms; }
+/* Barre haute : le nom en police ronde, surligné soleil, un point corail — la touche d'accent de la marque. */
+.barre { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 var(--gutter); background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 2; }
+.barre .marque { font-family: var(--font-display); font-weight: 800; font-size: 21px; letter-spacing: -.01em; display: inline-flex; align-items: center; gap: 6px; }
+.barre .marque::before { content: var(--app-name); padding: 0 4px; border-radius: 6px; background: linear-gradient(transparent var(--surligneur-haut), var(--surligneur) var(--surligneur-haut)); }
+.barre .marque::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-1); flex: none; }
+/* Cartes : rondes, ombre colorée douce */
+.carte { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px var(--gutter); }
+.carte h2, .carte h3 { margin: 0 0 6px; font-size: 18px; }
+/* Emoji de titre : décoratif, un par carte au plus, toujours aria-hidden */
+.emoji { font-family: var(--font); font-style: normal; margin-left: 4px; }
+/* Texte : .detail porte l'information principale (source · date · validité) ; .muet, les métadonnées seulement. */
+.detail { color: var(--text); font-size: var(--fs-body); }
+.muet { color: var(--muted); font-size: var(--fs-small); }
+/* Boutons : pression visible (léger rétrécissement), transition courte */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--tap); padding: 0 18px; border-radius: 999px; border: 1px solid var(--input); background: var(--surface); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; transition: transform var(--duree) var(--courbe), background-color var(--duree) var(--courbe), box-shadow var(--duree) var(--courbe); }
+.btn:hover { background: var(--surface-2); }
+.btn:active { transform: scale(.97); }
+.btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.btn-primaire { background: var(--primary); border-color: var(--primary); color: var(--on-primary); box-shadow: var(--shadow-primary); }
+.btn-primaire:hover { background: var(--primary-strong); border-color: var(--primary-strong); }
+/* Boutons d'accent (décoratifs, jamais un sens) : le texte sombre sur corail, soleil, lagon ; clair sur lavande */
+.btn-accent-1 { background: var(--accent-1); border-color: var(--accent-1); color: var(--on-accent-1); box-shadow: var(--shadow-accent-1); }
+.btn-accent-1:hover { background: var(--accent-1-hover); border-color: var(--accent-1-hover); }
+.btn-accent-2 { background: var(--accent-2); border-color: var(--accent-2); color: var(--on-accent-2); }
+.btn-accent-2:hover { background: var(--accent-2-hover); border-color: var(--accent-2-hover); }
+.btn-accent-3 { background: var(--accent-3); border-color: var(--accent-3); color: var(--on-accent-3); }
+.btn-accent-3:hover { background: var(--accent-3-hover); border-color: var(--accent-3-hover); }
+.btn-accent-4 { background: var(--accent-4); border-color: var(--accent-4); color: var(--on-accent-4); }
+.btn-accent-4:hover { background: var(--accent-4-hover); border-color: var(--accent-4-hover); }
+.btn-bloc { width: 100%; }
+.btn-grand { min-height: 64px; font-size: 18px; font-family: var(--font-display); }
+/* Bouton icône (barre haute) : un cercle de 48 px, toujours avec un aria-label. */
+.btn-icone { display: inline-flex; align-items: center; justify-content: center; width: var(--tap); min-width: var(--tap); height: var(--tap); padding: 0; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer; text-decoration: none; transition: transform var(--duree) var(--courbe), background-color var(--duree) var(--courbe); }
+.btn-icone:hover { background: var(--primary-soft); }
+.btn-icone:active { transform: scale(.94); }
+.btn-icone:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.btn-icone svg { width: 24px; height: 24px; flex: none; }
+/* Lien d'action dans une carte : souligné (jamais par la seule couleur), cible de 48 px. */
+.lien { display: inline-flex; align-items: center; min-height: var(--tap); color: var(--primary-strong); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.lien:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; border-radius: var(--radius-sm); }
+/* Champs */
+.champ { width: 100%; min-height: var(--tap); padding: 10px 16px; border: 1px solid var(--input); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font: inherit; transition: box-shadow var(--duree) var(--courbe); }
+.champ::placeholder { color: var(--muted); }
+.champ:focus-visible { outline: 3px solid var(--primary); outline-offset: 1px; }
+/* Pastilles de statut — le libellé est OBLIGATOIRE dans la pastille ; couleurs sémantiques seulement */
+.pastille { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: var(--fs-small); font-weight: 700; line-height: 1.3; }
+.pastille::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.pastille-ok { color: var(--ok); background: var(--ok-soft); }
+.pastille-warn { color: var(--warn); background: var(--warn-soft); }
+.pastille-danger { color: var(--danger); background: var(--danger-soft); }
+.pastille-neutre { color: var(--neutral); background: var(--neutral-soft); }
+/* Pastille de NUMÉRO (niveaux 1 à 4) : un accent par niveau, DÉCORATION seulement — le statut est dans la pastille sémantique à côté. */
+.pastille-num { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; font-family: var(--font-display); font-weight: 800; font-size: 15px; line-height: 1; flex: 0 0 auto; }
+.pastille-num-1 { background: var(--accent-1); color: var(--on-accent-1); }
+.pastille-num-2 { background: var(--accent-2); color: var(--on-accent-2); }
+.pastille-num-3 { background: var(--accent-3); color: var(--on-accent-3); }
+.pastille-num-4 { background: var(--accent-4); color: var(--on-accent-4); }
+/* Carte de synthèse : aucune bordure colorée par défaut ; un modificateur par verdict, le mot toujours écrit dans la pastille. */
+.synthese-ok { border: 2px solid var(--ok); }
+.synthese-warn { border: 2px solid var(--warn); }
+.synthese-danger { border: 2px solid var(--danger); }
+/* Bandeau d'avertissement (ambre : jamais rouge pour un simple « non vérifié ») */
+.bandeau { padding: 12px 14px; border-radius: var(--radius-sm); font-size: var(--fs-note); border: 1px solid transparent; }
+.bandeau-warn { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.bandeau-info { background: var(--primary-soft); color: var(--primary-strong); }
+/* Séparateur, listes (les pages posent role="list" : list-style: none retire la sémantique dans certains lecteurs d'écran) */
+.liste { list-style: none; margin: 0; padding: 0; }
+.liste > li { padding: 10px 0; border-top: 1px solid var(--border); }
+.liste > li:first-child { border-top: 0; }
+/* Barre basse (actions sous le pouce) : coins hauts arrondis, ombre vers le haut */
+.pied { position: sticky; bottom: 0; padding: 12px var(--gutter) calc(12px + var(--safe-bottom)); background: var(--surface); border-top: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; box-shadow: 0 -6px 20px var(--shadow-color); display: flex; gap: 10px; }
+.cache-visuel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Mouvement réduit : tout est coupé, les blocs sont simplement là. */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .btn:active, .btn-icone:active { transform: none; } }
