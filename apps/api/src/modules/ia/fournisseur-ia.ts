@@ -50,6 +50,8 @@ export interface ReponseIa<T> {
 
 export interface FournisseurIa {
   readonly nom: NomFournisseur;
+  /** Le modèle que ce fournisseur appelle par défaut (la ligne d'échec du journal, quand aucune réponse n'a dit lequel a répondu). */
+  readonly modeleParDefaut: string;
   /** Lit une image selon la consigne et rend l'objet JSON validé par `schema`. */
   lireImage<T>(image: ImageIa, consigne: Consigne, schema: z.ZodType<T, z.ZodTypeDef, unknown>, options: OptionsAppel): Promise<ReponseIa<T>>;
   /** Transcrit un audio (lot 4 ; OVH seulement — Claude rend `non_supporte`). L'audio n'est jamais conservé. */

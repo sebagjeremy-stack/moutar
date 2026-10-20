@@ -24,14 +24,27 @@ export const CONSIGNE_LOGO: Consigne = {
   utilisateur: 'Décris les symboles de certification cacher visibles sur cette photo, en JSON, selon la consigne.',
 };
 
-const texte = (max: number) => z.string().trim().max(max);
+/**
+ * Ce qu'on accepte du modèle : on TRONQUE, on ne refuse pas (relecture des lots 3-5) — un texte trop long est coupé, un
+ * tableau trop long est coupé, une confiance hors [0, 1] est ramenée dans l'intervalle (0 si elle n'est pas un nombre), une
+ * entrée qui n'est pas une chaîne est écartée. Seule l'ABSENCE de `candidats` reste un refus (502 `reponse_illisible`) : le
+ * code fait ensuite la correspondance, jamais une confiance aveugle au modèle.
+ */
+const texte = (max: number) => z.string().transform((s) => s.trim().slice(0, max));
+const texteFacultatif = (max: number) => z.preprocess((v) => (typeof v === 'string' ? v : ''), texte(max));
+const chaines = (max: number, n: number) =>
+  z.preprocess((v) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, n) : []), z.array(texte(max)));
+/** Une confiance 0-1 : bornée (`clamp`), 0 si le modèle n'a pas rendu un nombre. */
+export const confianceBornee = z.preprocess((v) => {
+  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0;
+}, z.number());
 
-/** Ce qu'on accepte du modèle : des chaînes bornées, une confiance entre 0 et 1 ; tout le reste est ignoré. */
 export const schemaLectureLogo: z.ZodType<LectureLogo, z.ZodTypeDef, unknown> = z.object({
-  candidats: z
-    .array(z.object({ texteLu: texte(200), forme: texte(300).default(''), confiance: z.coerce.number().min(0).max(1).default(0.5) }))
-    .max(20)
-    .default([]),
-  mentions: z.array(texte(100)).max(20).default([]),
-  autresTextes: z.array(texte(300)).max(40).default([]),
+  candidats: z.preprocess(
+    (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'object' && x !== null).slice(0, 20) : v),
+    z.array(z.object({ texteLu: texteFacultatif(200), forme: texteFacultatif(300), confiance: confianceBornee })),
+  ),
+  mentions: chaines(100, 20),
+  autresTextes: chaines(300, 40),
 });

@@ -18,7 +18,7 @@ export const journalIa = pgTable(
     jetonsEntree: integer('jetons_entree'),
     jetonsSortie: integer('jetons_sortie'),
     ok: boolean('ok').notNull(),
-    /** Un code stable (`moteur_indisponible`, `reponse_illisible`, `delai_depasse`…), jamais un message du moteur. */
+    /** Un code stable de `CodeErreurIa` (`moteur_indisponible` — réseau, 5xx ou délai —, `moteur_sature`, `reponse_illisible`, `lecture_refusee`, `non_supporte`), jamais un message du moteur. */
     erreur: text('erreur'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

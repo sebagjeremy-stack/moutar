@@ -10,13 +10,41 @@ import { phraseErreur } from '../../lib/erreurs';
  * `audio/webm` enregistré par `MediaRecorder`, envoyé puis oublié — seulement si la route répond (sondée une fois, à vide :
  * 404 ou 501 = absente, et l'état dit « Votre navigateur ne dicte pas ; tapez le nom »). Tolérant : tout ce qui n'est pas
  * un texte rendu finit en phrase française, jamais en « aucun ».
+ * Relecture des lots 3-5 : un texte de ponctuation seule ou une hallucination connue de Whisper sur du silence
+ * (« Sous-titrage … », « Merci d'avoir regardé », « ... ») vaut « rien entendu » ; une confiance du serveur sous 0,5 donne
+ * l'état `incertain` avec le texte PROPOSÉ, à confirmer d'un clic (`confirmer`) ou à écarter (`ignorer`) — jamais une
+ * recherche lancée d'elle-même sur un texte douteux.
  */
 export type EtatDictee =
   | { phase: 'indisponible'; message: string }
   | { phase: 'pret'; mode: 'navigateur' | 'serveur' }
   | { phase: 'ecoute'; mode: 'navigateur' | 'serveur' }
   | { phase: 'envoi' }
+  /** Le moteur a entendu quelque chose, sans certitude : le texte est proposé, l'utilisateur confirme ou tape. */
+  | { phase: 'incertain'; mode: 'navigateur' | 'serveur'; texte: string; message: string }
   | { phase: 'echec'; message: string };
+
+/** Sous cette confiance (0-1, rendue par le serveur), le texte est proposé à confirmer, pas cherché. */
+export const SEUIL_CONFIANCE_DICTEE = 0.5;
+
+/** Ce que Whisper invente sur du silence ou du bruit (vu en vrai sur OVH, lot 4) : jamais un nom de produit. */
+const HALLUCINATIONS: readonly RegExp[] = [
+  /^sous[- ]?titr/iu,
+  /^sous[- ]?titres?\b/iu,
+  /merci d['’]avoir regard/iu,
+  /^merci\.?$/iu,
+  /abonnez[- ]vous/iu,
+  /^amara\.org/iu,
+  /^\[?(musique|music|applaudissements|rires)\]?$/iu,
+  /^(st'?\s*501|mfp)\b/iu,
+];
+
+/** Pure : vrai quand un texte dicté peut servir — ni vide, ni ponctuation seule (« ... »), ni hallucination connue. */
+export function texteDicteUtile(texte: string): boolean {
+  const t = texte.trim();
+  if (!t || /^[\s\p{P}\p{S}]*$/u.test(t)) return false;
+  return !HALLUCINATIONS.some((h) => h.test(t));
+}
 
 export const MESSAGE_INDISPONIBLE = 'Votre navigateur ne dicte pas ; tapez le nom.';
 /** Un enregistrement envoyé au serveur ne dépasse pas huit secondes (un nom de produit, une marque). */
@@ -59,7 +87,7 @@ const ERREURS_RECONNAISSANCE: Readonly<Record<string, string>> = {
   aborted: 'Dictée interrompue.',
 };
 
-export function useDictee(surTexte: (texte: string) => void): { etat: EtatDictee; demarrer: () => void; arreter: () => void } {
+export function useDictee(surTexte: (texte: string) => void): { etat: EtatDictee; demarrer: () => void; arreter: () => void; confirmer: () => void; ignorer: () => void } {
   const [etat, setEtat] = useState<EtatDictee>(() => (constructeurNavigateur() ? { phase: 'pret', mode: 'navigateur' } : enregistreurPossible() ? { phase: 'pret', mode: 'serveur' } : { phase: 'indisponible', message: MESSAGE_INDISPONIBLE }));
   const reconnaissance = useRef<Reconnaissance | null>(null);
   const enregistreur = useRef<{ arreter: () => void } | null>(null);
@@ -92,7 +120,7 @@ export function useDictee(surTexte: (texte: string) => void): { etat: EtatDictee
       const texte = Array.from({ length: e.results.length }, (_, i) => e.results[i]?.[0]?.transcript ?? '')
         .join(' ')
         .trim();
-      if (texte) {
+      if (texteDicteUtile(texte)) {
         rendu = true;
         surTexteRef.current(texte);
       }
@@ -159,15 +187,21 @@ export function useDictee(surTexte: (texte: string) => void): { etat: EtatDictee
     setEtat({ phase: 'envoi' });
     const fd = new FormData();
     fd.append('audio', audio, 'dictee.webm');
-    const r = await appel<{ texte?: string }>(ROUTE_TRANSCRIPTIONS, { method: 'POST', body: fd });
+    const r = await appel<{ texte?: string; confiance?: number | null }>(ROUTE_TRANSCRIPTIONS, { method: 'POST', body: fd });
     // L'audio n'existe plus qu'ici : il part avec la requête, rien n'est gardé.
     if (!r.ok) {
       setEtat(r.statut === 404 || r.statut === 501 ? { phase: 'indisponible', message: MESSAGE_INDISPONIBLE } : { phase: 'echec', message: phraseErreur(r) });
       return;
     }
     const texte = typeof r.data?.texte === 'string' ? r.data.texte.trim() : '';
-    if (!texte) {
+    if (!texteDicteUtile(texte)) {
       setEtat({ phase: 'echec', message: ERREURS_RECONNAISSANCE['no-speech'] });
+      return;
+    }
+    const confiance = typeof r.data?.confiance === 'number' ? r.data.confiance : null;
+    if (confiance !== null && confiance < SEUIL_CONFIANCE_DICTEE) {
+      // Le moteur doute : on propose le texte, on ne cherche rien tant que l'utilisateur n'a pas confirmé.
+      setEtat({ phase: 'incertain', mode: 'serveur', texte, message: `Vous avez dit « ${texte} » ? Confirmez, ou tapez le nom.` });
       return;
     }
     surTexteRef.current(texte);
@@ -188,5 +222,19 @@ export function useDictee(surTexte: (texte: string) => void): { etat: EtatDictee
     setEtat({ phase: 'indisponible', message: MESSAGE_INDISPONIBLE });
   }, [etat.phase, demarrerNavigateur, demarrerServeur]);
 
-  return { etat, demarrer, arreter };
+  /** L'utilisateur confirme le texte proposé (état `incertain`) : il va au champ, qui cherche. */
+  const confirmer = useCallback(() => {
+    setEtat((s) => {
+      if (s.phase !== 'incertain') return s;
+      surTexteRef.current(s.texte);
+      return { phase: 'pret', mode: s.mode };
+    });
+  }, []);
+
+  /** L'utilisateur écarte le texte proposé : rien n'est cherché. */
+  const ignorer = useCallback(() => {
+    setEtat((s) => (s.phase === 'incertain' ? { phase: 'pret', mode: s.mode } : s));
+  }, []);
+
+  return { etat, demarrer, arreter, confirmer, ignorer };
 }

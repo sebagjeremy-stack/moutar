@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ContributionPublique } from '@moutar/shared-types';
 import { ErreurMetier } from '../../common/erreurs/erreur-metier';
 import { contributionFondatrice, nettoyerProposition, preuveUrlAdmise, verdictDeContribution } from './contributions-regles';
-import { schemaProposition, schemaSignalement, verifierPreuve } from './contributions.controller';
+import { schemaProposition, schemaSignalement, verifierPreuve, verifierPseudonyme, verifierSourceDate } from './contributions.controller';
 
 const HOTES = ['facebook.com', 'lesbonsplanscachers.fr'];
 
@@ -11,6 +11,10 @@ describe('preuveUrlAdmise (https, hôtes admis et leurs sous-domaines)', () => {
     expect(preuveUrlAdmise('https://www.facebook.com/groups/lbpc/posts/1', HOTES)).toBe('https://www.facebook.com/groups/lbpc/posts/1');
     expect(preuveUrlAdmise(' https://m.facebook.com/x#frag ', HOTES)).toBe('https://m.facebook.com/x');
     expect(preuveUrlAdmise('https://lesbonsplanscachers.fr/produit/42?x=1', HOTES)).toBe('https://lesbonsplanscachers.fr/produit/42?x=1');
+  });
+  it('retire fbclid et utm_* de la preuve, garde les autres paramètres', () => {
+    expect(preuveUrlAdmise('https://www.facebook.com/groups/lbpc/posts/1?fbclid=IwAR0abc&utm_source=fb&utm_medium=social&comment_id=7', HOTES)).toBe('https://www.facebook.com/groups/lbpc/posts/1?comment_id=7');
+    expect(preuveUrlAdmise('https://lesbonsplanscachers.fr/p?UTM_CAMPAIGN=x', HOTES)).toBe('https://lesbonsplanscachers.fr/p');
   });
   it('refuse http, un hôte hors liste, un hôte qui finit pareil sans être un sous-domaine, javascript:, des identifiants, un texte', () => {
     expect(preuveUrlAdmise('http://www.facebook.com/x', HOTES)).toBeNull();
@@ -32,6 +36,30 @@ describe('preuveUrlAdmise (https, hôtes admis et leurs sous-domaines)', () => {
       expect(err.getStatus()).toBe(400);
       expect(err.getResponse()).toMatchObject({ code: 'preuve_refusee', hotesAdmis: HOTES });
     }
+  });
+});
+
+describe('verifierSourceDate et verifierPseudonyme (400 date_invalide / pseudonyme_invalide)', () => {
+  const code = (fn: () => unknown): unknown => {
+    try {
+      fn();
+    } catch (e) {
+      return (e as ErreurMetier).getResponse();
+    }
+    return null;
+  };
+  it('un jour réel et passé passe ; 2026-13-45, le 31 avril et demain → 400 date_invalide ; vide → null', () => {
+    expect(verifierSourceDate('2026-05-03', '2026-10-20')).toBe('2026-05-03');
+    expect(verifierSourceDate('2026-10-20', '2026-10-20')).toBe('2026-10-20');
+    expect(verifierSourceDate(null)).toBeNull();
+    expect(code(() => verifierSourceDate('2026-13-45', '2026-10-20'))).toMatchObject({ code: 'date_invalide' });
+    expect(code(() => verifierSourceDate('2026-04-31', '2026-10-20'))).toMatchObject({ code: 'date_invalide' });
+    expect(code(() => verifierSourceDate('2026-10-21', '2026-10-20'))).toMatchObject({ code: 'date_invalide', aujourdhui: '2026-10-20' });
+  });
+  it('un pseudonyme avec « @ » → 400 pseudonyme_invalide, le contrat dit « un pseudonyme, pas votre nom ni votre e-mail »', () => {
+    expect(verifierPseudonyme('Sarah')).toBe('Sarah');
+    expect(verifierPseudonyme(null)).toBeNull();
+    expect(code(() => verifierPseudonyme('sarah@exemple.fr'))).toMatchObject({ code: 'pseudonyme_invalide', message: expect.stringContaining('pas votre nom ni votre e-mail') });
   });
 });
 

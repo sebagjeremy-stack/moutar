@@ -72,17 +72,11 @@ export class MoteurIa {
       } catch (e) {
         derniere = e instanceof ErreurIa ? e : new ErreurIa('moteur_indisponible', 'Le moteur est indisponible.');
         this.logger.warn(`${f.nom} · ${usage} : ${derniere.code} (${derniere.message})${derniere.relancable && tentative < RELANCES ? ' — relance' : ''}`);
-        await this.journal.enregistrer({ fournisseur: f.nom, modele: modeleDe(f), usage, dureeMs: Date.now() - t0, jetonsEntree: null, jetonsSortie: null, ok: false, erreur: derniere.code });
+        await this.journal.enregistrer({ fournisseur: f.nom, modele: f.modeleParDefaut, usage, dureeMs: Date.now() - t0, jetonsEntree: null, jetonsSortie: null, ok: false, erreur: derniere.code });
         if (!derniere.relancable) break;
       }
     }
     const err = derniere!;
     throw new ErreurMetier(STATUT_ERREUR_IA[err.code], err.code, err.message);
   }
-}
-
-/** Le modèle d'un fournisseur pour une ligne d'échec (la réponse n'a pas dit lequel a répondu). */
-function modeleDe(f: FournisseurIa): string {
-  const cfg = (f as unknown as { cfg?: { modele?: string; modeleVision?: string } }).cfg;
-  return cfg?.modele ?? cfg?.modeleVision ?? f.nom;
 }

@@ -14,6 +14,9 @@ export interface ConfigOvh {
 
 export type FetchIa = typeof fetch;
 
+/** `max_tokens` de la lecture d'une étiquette : une longue liste d'ingrédients en JSON tient (aligné sur Claude, 4096). */
+export const MAX_TOKENS_OVH = 4096;
+
 /** Le corps d'une réponse `audio/transcriptions` en `verbose_json` (ce qu'on en lit). */
 interface ReponseTranscription {
   text?: string;
@@ -36,6 +39,7 @@ interface ReponseChat {
  */
 export class OvhOpenAiFournisseur implements FournisseurIa {
   readonly nom = 'ovh' as const;
+  readonly modeleParDefaut: string;
   private readonly logger = new Logger('IaOvh');
   private readonly baseUrl: string;
 
@@ -44,13 +48,14 @@ export class OvhOpenAiFournisseur implements FournisseurIa {
     private readonly fetchImpl: FetchIa = fetch,
   ) {
     this.baseUrl = cfg.baseUrl.replace(/\/+$/, '');
+    this.modeleParDefaut = cfg.modeleVision;
   }
 
   async lireImage<T>(image: ImageIa, consigne: Consigne, schema: z.ZodType<T, z.ZodTypeDef, unknown>, options: OptionsAppel): Promise<ReponseIa<T>> {
     const corps = {
       model: this.cfg.modeleVision,
       temperature: 0,
-      max_tokens: 2048,
+      max_tokens: MAX_TOKENS_OVH,
       messages: [
         { role: 'system', content: consigne.systeme },
         {

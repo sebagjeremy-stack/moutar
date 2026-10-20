@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { z } from 'zod';
@@ -10,11 +10,14 @@ import { LimiteLectures } from '../ia/limite-lectures';
 import { schemaEan } from '../produits/produits.controller';
 import { ProduitsService } from '../produits/produits.service';
 import { CertificationService } from './certification.service';
+import { LimiteCertifications } from './limite-certifications';
 
-const schemaValidation = z.object({
+/** La validation d'un clic : le jeton rendu par la lecture, un code, des mentions, le texte lu (nettoyé et borné par le service). */
+export const schemaValidation = z.object({
+  jeton: z.string().trim().min(8).max(64),
   code: z.string().trim().min(1).max(50),
   mentions: z.array(z.enum(MENTIONS_CERTIFICATION as [string, ...string[]])).max(5).default([]),
-  texteLu: z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), z.string().trim().max(200).nullable().optional()),
+  texteLu: z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), z.string().trim().max(1000).nullable().optional()),
 });
 
 /** Les limites de multer : 8 Mo (413 `fichier_trop_grand`), un fichier ; le type se lit ensuite dans les octets. */
@@ -29,12 +32,13 @@ export class LogosController {
   ) {}
 
   @Post('lire')
+  @HttpCode(200)
   @UseInterceptors(FileInterceptor('image', OPTIONS_IMAGE))
   lire(@Req() req: Request, @UploadedFile() image?: FichierImage): Promise<ResultatLectureLogo> {
     // L'image se vérifie d'abord (sans état), la limite ensuite : un fichier refusé ne compte pas.
     const img = imageRecue(image);
     this.limite.exiger(req.ip ?? 'inconnue');
-    return this.certification.lireLogo(img);
+    return this.certification.lireLogo(img, null);
   }
 }
 
@@ -45,16 +49,19 @@ export class CertificationController {
     private readonly certification: CertificationService,
     private readonly produits: ProduitsService,
     private readonly limite: LimiteLectures,
+    private readonly limiteEcritures: LimiteCertifications,
   ) {}
 
   @Post(':ean/logo')
+  @HttpCode(200)
   @UseInterceptors(FileInterceptor('image', OPTIONS_IMAGE))
   async lireLogo(@Param('ean') ean: string, @Req() req: Request, @UploadedFile() image?: FichierImage): Promise<ResultatLectureLogo> {
     const img = imageRecue(image);
+    const e = schemaEan.parse(ean);
     this.limite.exiger(req.ip ?? 'inconnue');
     // Le produit doit exister (404 sinon) ; ni son EAN ni son nom ne partent au moteur.
-    await this.produits.lireParEan(schemaEan.parse(ean));
-    return this.certification.lireLogo(img);
+    await this.produits.lireParEan(e);
+    return this.certification.lireLogo(img, e);
   }
 
   @Get(':ean/certification')
@@ -63,13 +70,18 @@ export class CertificationController {
   }
 
   @Post(':ean/certification')
-  valider(@Param('ean') ean: string, @Body() corps: unknown): Promise<CertificationProduit> {
+  valider(@Param('ean') ean: string, @Body() corps: unknown, @Req() req: Request): Promise<CertificationProduit> {
+    const e = schemaEan.parse(ean);
     const v = schemaValidation.parse(corps ?? {});
-    return this.certification.valider(schemaEan.parse(ean), { code: v.code, mentions: v.mentions as CertificationProduit['mentions'], texteLu: v.texteLu ?? null });
+    // Une requête refusée par zod ne compte pas ; 10 validations ou retraits par heure et par adresse.
+    this.limiteEcritures.exiger(req.ip ?? 'inconnue');
+    return this.certification.valider(e, { jeton: v.jeton, code: v.code, mentions: v.mentions as CertificationProduit['mentions'], texteLu: v.texteLu ?? null });
   }
 
   @Delete(':ean/certification')
-  retirer(@Param('ean') ean: string): Promise<{ ok: true }> {
-    return this.certification.retirer(schemaEan.parse(ean));
+  retirer(@Param('ean') ean: string, @Req() req: Request): Promise<{ ok: true }> {
+    const e = schemaEan.parse(ean);
+    this.limiteEcritures.exiger(req.ip ?? 'inconnue');
+    return this.certification.retirer(e);
   }
 }

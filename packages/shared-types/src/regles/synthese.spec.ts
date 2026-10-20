@@ -138,6 +138,18 @@ describe('synthèse : une marque citée sous une autre rubrique (lot 3, correcti
 
 describe('synthèse : la communauté (lot 5, niveau 3)', () => {
   const communaute = (statut: LigneSynthese['statut'], mention: string | null) => l({ niveau: 3, statut, source: 'Les Bons Plans Cachères', mention });
+  it('au seuil 4, composition lue : la pastille suit la composition, mais un « douteux » communautaire reste cité dans la phrase', () => {
+    const lignes = [l({ niveau: 1 }), l({ niveau: 2, statut: 'non_cite' }), communaute('non_verifie', 'signalé douteux'), l({ niveau: 4, composition: 'aucun_additif_problematique', source: 'table' })];
+    const s = calculerSynthese(lignes, 4, AUJOURDHUI);
+    expect(s.pastille).toBe('Non vérifié · composition seule');
+    expect(s.niveauFondateur).toBe(4);
+    expect(s.phrase).toBe('Aucun additif repéré, mais la composition seule ne garantit rien ; aucune liste ni certification ne cite ce produit, et Les Bons Plans Cachères le signale douteux.');
+    const douteuse = calculerSynthese([...lignes.slice(0, 3), l({ niveau: 4, composition: 'douteux', source: 'table' })], 4, AUJOURDHUI);
+    expect(douteuse.pastille).toBe('Non vérifié · additif douteux');
+    expect(douteuse.phrase).toContain(', et Les Bons Plans Cachères le signale douteux.');
+    // Sans contribution douteuse, la phrase ne change pas.
+    expect(calculerSynthese([lignes[0], lignes[1], l({ niveau: 3 }), lignes[3]], 4, AUJOURDHUI).phrase).toBe('Aucun additif repéré, mais la composition seule ne garantit rien ; aucune liste ni certification ne cite ce produit.');
+  });
   it('un « cite » validé fonde un « permis » seulement si le seuil atteint 3', () => {
     const lignes = [l({ niveau: 1 }), l({ niveau: 2, statut: 'non_cite' }), communaute('cite', 'communauté · LBPC'), l({ niveau: 4 })];
     expect(calculerSynthese(lignes, 3, AUJOURDHUI)).toMatchObject({ verdict: 'permis', pastille: 'Permis · communauté · LBPC', niveauFondateur: 3 });

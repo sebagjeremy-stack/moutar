@@ -53,13 +53,30 @@ function motEntier(motif: RegExp, drapeaux = 'iu'): RegExp {
 /** Un code E écrit entre parenthèses juste après le libellé courant (avant la virgule suivante) : « rouge cochenille A (E124) ». */
 const CODE_ENTRE_PARENTHESES_APRES = /^[^,;()]*\(\s*e[\s-]?\d{3,4}/iu;
 
+/** Un « E » précédé de « vitamine » ou « vit. » est une vitamine, pas un additif (« vitamine E 100 mg »). */
+const PRECEDE_PAR_VITAMINE = /(?:vitamines?|vit\.?)\s*$/iu;
+/** Un code suivi d'une unité est une quantité (« ÉNERGIE 250 kcal », « DE 120 g », « CONTENANCE 500 ml »), pas un additif. */
+const SUIVI_PAR_UNITE = /^\s?(?:mg|µg|μg|g|kg|%|kcal|kj|ml|cl|l)(?![\p{L}\p{N}])/iu;
+
+/**
+ * Pure : vrai quand ce qui ressemble à un code E, entre `debut` et `fin` dans `source`, est en fait une vitamine E
+ * (« vitamine E 100 mg », « vit. E ») ou une quantité (suivie d'une unité : mg, µg, g, %, kcal, kJ, ml…). Partagée par
+ * l'analyse (lot 1) et le nettoyage de l'OCR (lot 3), qui ne recolle jamais un tel « E ».
+ */
+export function vitamineOuQuantite(source: string, debut: number, fin: number): boolean {
+  return PRECEDE_PAR_VITAMINE.test(source.slice(Math.max(0, debut - 12), debut)) || SUIVI_PAR_UNITE.test(source.slice(fin, fin + 6));
+}
+
 /**
  * Pure : les codes E écrits dans un texte (E 322, e322, E-322, E472e, E 472 e, E450i → E450), sans doublon, dans l'ordre.
- * Un espace avant la lettre est toléré ; des chiffres espacés (« E 1 2 0 », OCR) ne se lisent pas (lot 3).
+ * Un espace avant la lettre est toléré ; des chiffres espacés (« E 1 2 0 », OCR) ne se lisent pas (lot 3) ; une vitamine E
+ * suivie d'un nombre ou un nombre suivi d'une unité ne se lisent pas non plus (« vitamine E 100 mg », `vitamineOuQuantite`).
  */
 export function extraireCodesE(texte: string): string[] {
   const vus = new Set<string>();
   for (const m of texte.matchAll(/(?<![\p{L}\p{N}])e[\s-]?(\d{3,4})(?:\s?([a-hj-uw-z]))?(?:[ivx]{1,4})?(?![\p{L}\p{N}])/giu)) {
+    const debut = m.index ?? 0;
+    if (vitamineOuQuantite(texte, debut, debut + m[0].length)) continue;
     const code = normaliserCodeE(m[0].replace(/\s|-/g, ''));
     if (code) vus.add(code);
   }

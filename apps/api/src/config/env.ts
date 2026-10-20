@@ -62,6 +62,11 @@ export function refusDemarrage(env: Env): string | null {
     }
   }
   if (env.IA_FOURNISSEUR === 'anthropic' && !env.ANTHROPIC_API_KEY) return 'IA_FOURNISSEUR=anthropic exige ANTHROPIC_API_KEY (le nom de la variable seulement, jamais la clé dans le code).';
+  // En production, l'hôte d'OVH n'est jamais appelé sans jeton : sans mandataire, un appel sans clé est refusé (401) ou
+  // tombe sur la limite serrée de l'endpoint anonyme ; on refuse de démarrer plutôt que de servir un moteur boiteux.
+  if (env.NODE_ENV === 'production' && env.IA_FOURNISSEUR === 'ovh' && env.IA_BASE_URL && !env.IA_API_KEY) {
+    return 'En production, IA_FOURNISSEUR=ovh exige IA_API_KEY (le jeton OVHcloud AI Endpoints, posé dans l’environnement — jamais dans le code) : l’API refuse de démarrer.';
+  }
   return null;
 }
 

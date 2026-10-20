@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import type { Consigne } from '../ia/fournisseur-ia';
+import { confianceBornee } from '../certification/consigne-logo';
+import { INGREDIENTS_MAX } from '../produits/produits.controller';
 
 /**
  * La consigne de l'OCR d'une liste d'ingrédients (lot 3) : transcrire FIDÈLEMENT la liste lisible, et seulement elle (ni
@@ -26,9 +28,17 @@ export interface ReponseOcr {
   confiance: number;
 }
 
+/** Le texte lu est borné à 10 000 caractères (la même borne que `PUT …/ingredients`, `INGREDIENTS_MAX`). */
+export const TEXTE_OCR_MAX = INGREDIENTS_MAX;
+
+/**
+ * Ce qu'on accepte du modèle : on TRONQUE, on ne refuse pas — le texte est coupé à 10 000, la langue à 10, la confiance
+ * ramenée dans [0, 1] (0 si elle n'est pas un nombre). Seule l'ABSENCE de `texte` (ou un `texte` qui n'est pas une chaîne)
+ * reste un refus (502 `reponse_illisible`).
+ */
 export const schemaReponseOcr: z.ZodType<ReponseOcr, z.ZodTypeDef, unknown> = z.object({
-  texte: z.string().max(10_000).default(''),
+  texte: z.string().transform((s) => s.slice(0, TEXTE_OCR_MAX)),
   langue: z.preprocess((v) => (typeof v === 'string' && v.trim() ? v.trim().toLowerCase().slice(0, 10) : null), z.string().nullable()).default(null),
-  lisible: z.coerce.boolean().default(true),
-  confiance: z.coerce.number().min(0).max(1).default(0.5),
+  lisible: z.preprocess((v) => (typeof v === 'boolean' ? v : typeof v === 'string' ? !/^(false|non|no|0)$/i.test(v.trim()) : true), z.boolean()),
+  confiance: confianceBornee,
 });

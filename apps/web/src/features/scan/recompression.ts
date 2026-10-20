@@ -1,8 +1,9 @@
 /**
  * Recompression d'une photo DANS le navigateur, avant l'envoi au serveur (lot 3) : au plus 1 600 px de côté et 4 Mo, en
  * JPEG — le serveur accepte 8 Mo, le fournisseur Claude 5 Mo en base64, et une photo de téléphone en fait souvent plus.
- * Au passage, une image que le navigateur sait décoder mais que le serveur refuse (HEIC des iPhone) devient un JPEG, et
- * l'orientation EXIF est appliquée (le moteur lit l'image telle qu'elle est dessinée).
+ * L'image est TOUJOURS redessinée (relecture des lots 3-5) : c'est ce qui applique l'orientation EXIF (une photo de
+ * téléphone « dans les clous » mais couchée partirait sinon telle quelle, et le moteur lirait une étiquette de côté) et ce
+ * qui fait d'un HEIC que le navigateur décode un JPEG. Le coût : un ré-encodage JPEG à 0,85 pour une image déjà petite.
  * Les outils du navigateur (décodage, canvas) sont injectés : la boucle se teste avec un canvas simulé.
  * Rien n'est gardé : l'image décodée est libérée dès la fin.
  */
@@ -17,9 +18,6 @@ export interface OptionsRecompression {
 }
 
 export const RECOMPRESSION_PHOTO: OptionsRecompression = { coteMax: 1600, octetsMax: 4_000_000, qualiteDepart: 0.85, qualiteMin: 0.5, pasQualite: 0.1 };
-
-/** Les types que le serveur lit dans les octets (`type-image.ts`) : une image déjà dans les clous part telle quelle. */
-const TYPES_ACCEPTES: readonly string[] = ['image/jpeg', 'image/png', 'image/webp'];
 
 export interface ImageDecodee {
   largeur: number;
@@ -65,15 +63,16 @@ export interface Recompressee {
   blob: Blob;
   largeur: number;
   hauteur: number;
-  /** `null` quand l'image est partie telle quelle. */
-  qualite: number | null;
-  recompressee: boolean;
+  /** La qualité JPEG retenue. */
+  qualite: number;
+  /** Toujours vrai : l'image est redessinée (orientation EXIF appliquée, JPEG). */
+  recompressee: true;
 }
 
 /**
- * Rend l'image à envoyer. Une image d'un type accepté, déjà sous les bornes, part telle quelle (aucune perte) ; sinon elle
- * est redessinée en JPEG, la qualité baissant jusqu'à passer sous `octetsMax`, puis le côté réduit de moitié si la qualité
- * minimale n'y suffit pas (trois tours au plus).
+ * Rend l'image à envoyer, TOUJOURS redessinée en JPEG (orientation EXIF appliquée au décodage), ramenée sous `coteMax`,
+ * la qualité baissant jusqu'à passer sous `octetsMax`, puis le côté réduit de moitié si la qualité minimale n'y suffit pas
+ * (trois tours au plus).
  */
 export async function recompresser(image: Blob, options: OptionsRecompression = RECOMPRESSION_PHOTO, outils: OutilsImage = outilsDuNavigateur()): Promise<Recompressee> {
   let decodee: ImageDecodee;
@@ -83,9 +82,6 @@ export async function recompresser(image: Blob, options: OptionsRecompression = 
     throw new ImageIllisible();
   }
   try {
-    const dansLesClous = TYPES_ACCEPTES.includes(image.type) && Math.max(decodee.largeur, decodee.hauteur) <= options.coteMax && image.size <= options.octetsMax;
-    if (dansLesClous) return { blob: image, largeur: decodee.largeur, hauteur: decodee.hauteur, qualite: null, recompressee: false };
-
     let cible = dimensionsReduites(decodee.largeur, decodee.hauteur, options.coteMax);
     let dernier: { blob: Blob; qualite: number } | null = null;
     for (let tour = 0; tour < 3; tour++) {

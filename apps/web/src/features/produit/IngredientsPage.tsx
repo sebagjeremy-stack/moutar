@@ -12,6 +12,9 @@ import { formaterEan } from '../../lib/dates';
 import { phraseErreur } from '../../lib/erreurs';
 import { confianceEnMots } from '../certification/confiance-en-mots';
 
+/** La même borne que le serveur (`INGREDIENTS_MAX`, `PUT …/ingredients`) et que l'OCR : 10 000 caractères. */
+const INGREDIENTS_MAX = 10_000;
+
 /** Ce que `/scan` dépose dans `location.state` après l'OCR (jamais dans l'adresse) : la transcription, SANS écriture. */
 export interface EtatIngredients {
   transcription?: TranscriptionOcr | null;
@@ -90,7 +93,7 @@ export function IngredientsPage() {
           aide={lueSurPhoto ? 'Corrigez ce que la lecture a mal lu : un mot illisible est écrit « [illisible] ». Les codes E ont été remis en forme (E120, E322).' : 'Telle qu’elle est écrite sur l’emballage, avec les codes E.'}
           value={texte}
           onChange={(e) => setTexte(e.target.value)}
-          maxLength={5000}
+          maxLength={INGREDIENTS_MAX}
           autoFocus={!lueSurPhoto}
           className={lueSurPhoto ? 'min-h-[260px]' : ''}
         />

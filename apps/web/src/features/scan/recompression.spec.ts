@@ -63,13 +63,17 @@ describe('recompresser', () => {
     expect(r.blob.size).toBeLessThanOrEqual(RECOMPRESSION_PHOTO.octetsMax);
   });
 
-  it('laisse passer telle quelle une image acceptée déjà sous les bornes (aucune perte)', async () => {
-    const { outils, toiles } = outilsSimules(1200, 900);
-    const source = new Blob([new Uint8Array(1000)], { type: 'image/png' });
+  it('redessine QUAND MÊME une image acceptée déjà sous les bornes : l’orientation EXIF est appliquée au décodage (relecture)', async () => {
+    // Une photo de téléphone 1 200 × 900 « couchée » : le décodeur rend 900 × 1 200 (orientation appliquée), et c'est ce qui est redessiné.
+    const { outils, toiles, estLiberee } = outilsSimules(900, 1200);
+    const source = new Blob([new Uint8Array(1000)], { type: 'image/jpeg' });
     const r = await recompresser(source, RECOMPRESSION_PHOTO, outils);
-    expect(toiles).toHaveLength(0);
-    expect(r.blob).toBe(source);
-    expect(r).toMatchObject({ recompressee: false, qualite: null, largeur: 1200, hauteur: 900 });
+    expect(toiles).toHaveLength(1);
+    expect(toiles[0]).toMatchObject({ largeur: 900, hauteur: 1200, qualites: [0.85] });
+    expect(r.blob).not.toBe(source);
+    expect(r.blob.type).toBe('image/jpeg');
+    expect(r).toMatchObject({ recompressee: true, qualite: 0.85, largeur: 900, hauteur: 1200 });
+    expect(estLiberee()).toBe(true);
   });
 
   it('convertit en JPEG un type que le serveur refuse (HEIC), même petit', async () => {

@@ -10,10 +10,16 @@ import { envoyer } from '../../lib/api';
 import { phraseErreur } from '../../lib/erreurs';
 import { confianceEnMots } from './confiance-en-mots';
 
+/** La phrase d'une proposition sans jeton (résultat d'avant, adresse rouverte) : la même que celle du serveur. */
+const PHRASES_LOCALES = { proposition_inconnue: 'La proposition a expiré : reprenez la photo.' } as const;
+
 /**
  * Ce que l'IA PROPOSE après la lecture d'un logo ; l'utilisateur VALIDE d'un clic (« C'est bien ce logo ») — rien n'est
- * écrit avant. Sans produit identifié (`ean` null), la liste se lit seulement : on propose d'associer un produit.
- * Jamais un verdict ici : la confiance s'écrit en mots, dans une pastille neutre ; « aucun » n'est jamais rouge.
+ * écrit avant. La validation renvoie le JETON de la proposition (`resultat.jeton`, reçu de la lecture, porté par
+ * `location.state`, jamais par l'adresse) : expiré ou étranger au produit, le serveur répond 400 `proposition_inconnue`
+ * (« La proposition a expiré : reprenez la photo »). Sans produit identifié (`ean` null), la liste se lit seulement : on
+ * propose d'associer un produit. Jamais un verdict ici : la confiance s'écrit en mots, dans une pastille neutre ; « aucun »
+ * n'est jamais rouge.
  */
 export function PropositionsCertificateur({
   resultat,
@@ -85,7 +91,7 @@ export function PropositionsCertificateur({
       <p className="muet mb-1">{ean ? 'Moutar propose, vous validez : rien n’est écrit avant votre clic.' : 'Moutar propose ; pour retenir une certification, le produit doit d’abord être identifié.'}</p>
       <ol className="liste" role="list">
         {resultat.propositions.map((p, i) => (
-          <Proposition key={p.code} proposition={p} ean={ean} enAvant={i === 0} surValide={surValide} />
+          <Proposition key={p.code} proposition={p} ean={ean} jeton={resultat.jeton} enAvant={i === 0} surValide={surValide} surReprendre={surReprendre} />
         ))}
       </ol>
       <SymbolesInconnus symboles={resultat.candidatsNonReconnus} />
@@ -112,10 +118,10 @@ function mentionsPossibles(code: string): readonly MentionCertification[] {
   return CERTIFICATEURS_PAR_CODE.get(code)?.mentionsPossibles ?? MENTIONS_CERTIFICATION;
 }
 
-function Proposition({ proposition: p, ean, enAvant, surValide }: { proposition: PropositionCertificateur; ean: string | null; enAvant: boolean; surValide?: (c: CertificationProduit) => void }) {
+function Proposition({ proposition: p, ean, jeton, enAvant, surValide, surReprendre }: { proposition: PropositionCertificateur; ean: string | null; jeton: string | null; enAvant: boolean; surValide?: (c: CertificationProduit) => void; surReprendre: () => void }) {
   const [mentions, setMentions] = useState<MentionCertification[]>(p.mentions);
   const [envoi, setEnvoi] = useState(false);
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<{ message: string; expiree: boolean } | null>(null);
   const possibles = mentionsPossibles(p.code);
   const idBase = `proposition-${p.code}`;
 
@@ -123,10 +129,16 @@ function Proposition({ proposition: p, ean, enAvant, surValide }: { proposition:
     if (!ean) return;
     setEnvoi(true);
     setErreur(null);
-    const r = await envoyer<CertificationProduit>(`/api/v1/produits/${encodeURIComponent(ean)}/certification`, { code: p.code, mentions, texteLu: p.texteLu });
+    if (!jeton) {
+      // Une lecture sans jeton (adresse rouverte, résultat d'avant) ne se valide pas : il faut reprendre la photo.
+      setEnvoi(false);
+      setErreur({ message: PHRASES_LOCALES.proposition_inconnue, expiree: true });
+      return;
+    }
+    const r = await envoyer<CertificationProduit>(`/api/v1/produits/${encodeURIComponent(ean)}/certification`, { jeton, code: p.code, mentions, texteLu: p.texteLu });
     setEnvoi(false);
     if (!r.ok) {
-      setErreur(phraseErreur(r));
+      setErreur({ message: phraseErreur(r), expiree: r.code === 'proposition_inconnue' });
       return;
     }
     surValide?.(r.data);
@@ -171,11 +183,16 @@ function Proposition({ proposition: p, ean, enAvant, surValide }: { proposition:
       ) : null}
       {erreur ? (
         <Bandeau ton="warn" role="alert" className="mt-2">
-          {erreur}
+          <p>{erreur.message}</p>
+          {erreur.expiree ? (
+            <Bouton variante="primaire" className="mt-2" onClick={surReprendre}>
+              Reprendre la photo
+            </Bouton>
+          ) : null}
         </Bandeau>
       ) : null}
       {ean ? (
-        <Bouton variante={enAvant ? 'accent' : 'defaut'} accent={1} bloc className="mt-2" disabled={envoi} onClick={() => void valider()}>
+        <Bouton variante={enAvant ? 'accent' : 'defaut'} accent={1} bloc className="mt-2" disabled={envoi || erreur?.expiree === true} onClick={() => void valider()}>
           {envoi ? 'Validation…' : `C’est bien ce logo${enAvant ? '' : ` (${p.nomCourt})`}`}
         </Bouton>
       ) : null}
@@ -194,7 +211,7 @@ function SymbolesInconnus({ symboles }: { symboles: string[] }) {
           {i > 0 ? ', ' : ''}« {s} »
         </span>
       ))}
-      . Vous pourrez le signaler au lot 5.
+      . Signalez-le depuis la fiche du produit.
     </p>
   );
 }

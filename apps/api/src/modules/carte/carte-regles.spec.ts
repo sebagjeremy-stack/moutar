@@ -255,6 +255,12 @@ describe('ligne du niveau 3 (lot 5, contributions communautaires)', () => {
     expect(douteux.phrase).toContain('Signalé douteux par Les Bons Plans Cachères');
     expect(autour(ligneCommunautaire([contrib({ statutPropose: 'douteux' })], 0), 2).pastille).toBe('Non vérifié');
   });
+  it('synthèse au seuil 4, composition lue : un « douteux » communautaire validé reste cité dans la phrase', () => {
+    const communaute = ligneSyntheseNiveau3(ligneCommunautaire([contrib({ statutPropose: 'douteux' })], 0));
+    const s = calculerSynthese([communaute, { niveau: 4, statut: 'non_verifie', source: 'Table d’additifs Moutar', mention: null, composition: 'aucun_additif_problematique' }], 4, AUJOURDHUI);
+    expect(s).toMatchObject({ verdict: 'non_verifie', pastille: 'Non vérifié · composition seule', niveauFondateur: 4 });
+    expect(s.phrase).toContain(', et Les Bons Plans Cachères le signale douteux.');
+  });
   it('synthèse : une liste officielle qui cite l’emporte sur la communauté (niveau plus haut) ; un « non cacher » de la composition l’emporte sur un « cite » communautaire', () => {
     const communaute = ligneSyntheseNiveau3(ligneCommunautaire([contrib({})], 0));
     const liste = calculerSynthese([{ niveau: 2, statut: 'cite', source: 'Consistoire', mention: null, composition: null }, communaute], 3, AUJOURDHUI);

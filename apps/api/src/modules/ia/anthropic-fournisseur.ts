@@ -30,6 +30,7 @@ export function creerClientAnthropic(apiKey: string): ClientAnthropic {
  */
 export class AnthropicFournisseur implements FournisseurIa {
   readonly nom = 'anthropic' as const;
+  readonly modeleParDefaut: string;
   private readonly logger = new Logger('IaAnthropic');
   private readonly client: ClientAnthropic;
 
@@ -38,6 +39,7 @@ export class AnthropicFournisseur implements FournisseurIa {
     client?: ClientAnthropic,
   ) {
     this.client = client ?? creerClientAnthropic(cfg.apiKey);
+    this.modeleParDefaut = cfg.modele;
   }
 
   async lireImage<T>(image: ImageIa, consigne: Consigne, schema: z.ZodType<T, z.ZodTypeDef, unknown>, options: OptionsAppel): Promise<ReponseIa<T>> {

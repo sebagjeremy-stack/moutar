@@ -21,6 +21,7 @@ function fournisseur(scenarios: Array<ReponseIa<unknown> | ErreurIa | 'attendre'
   let i = 0;
   return {
     nom: 'ovh',
+    modeleParDefaut: 'Qwen',
     async lireImage(_i, _c, s, options: OptionsAppel) {
       const etape = scenarios[i++];
       if (etape === 'attendre') {

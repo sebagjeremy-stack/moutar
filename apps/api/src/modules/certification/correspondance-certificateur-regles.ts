@@ -74,8 +74,8 @@ interface Meilleure {
   mentions: Set<MentionCertification>;
 }
 
-/** Pure : des candidats lus aux propositions, sur le catalogue EFFECTIF (les certificateurs actifs seulement). */
-export function correspondreCertificateurs(lecture: LectureLogo, catalogue: ReadonlyArray<Certificateur>): ResultatLectureLogo {
+/** Pure : des candidats lus aux propositions, sur le catalogue EFFECTIF (les certificateurs actifs seulement) ; le jeton, c'est le service qui l'émet. */
+export function correspondreCertificateurs(lecture: LectureLogo, catalogue: ReadonlyArray<Certificateur>): Omit<ResultatLectureLogo, 'jeton'> {
   const meilleures = new Map<string, Meilleure>();
   const mentionsGlobales = lireMentions(lecture.mentions);
   const reconnus = new Set<number>();

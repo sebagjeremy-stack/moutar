@@ -24,6 +24,20 @@ export function jourLocal(instant: Date = new Date(), fuseau: string = FUSEAU_DU
 }
 
 /**
+ * Pure : vrai quand `AAAA-MM-JJ` est un jour RÉEL du calendrier (mois 1-12, jour dans le mois, années bissextiles) — sans
+ * passer par `Date`, qui « corrige » le 2026-13-45 en silence et lit le fuseau.
+ */
+export function jourReel(jour: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(jour);
+  if (!m) return false;
+  const [annee, mois, j] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (annee < 1900 || mois < 1 || mois > 12 || j < 1) return false;
+  const bissextile = (annee % 4 === 0 && annee % 100 !== 0) || annee % 400 === 0;
+  const longueurs = [31, bissextile ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return j <= longueurs[mois - 1];
+}
+
+/**
  * L'instant où COMMENCE un jour `AAAA-MM-JJ` dans le fuseau du centre (minuit à Paris, soit 22 h ou 23 h UTC la veille) :
  * ce qu'une statistique « du jour » compare à `created_at`. Jamais `current_date` en SQL (le réglage de PostgreSQL).
  */

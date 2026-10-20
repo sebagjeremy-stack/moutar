@@ -1,4 +1,4 @@
-import { Controller, Param, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, HttpCode, Param, Post, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import type { TranscriptionOcr } from '@moutar/shared-types';
@@ -9,7 +9,7 @@ import { schemaEan } from '../produits/produits.controller';
 import { ProduitsService } from '../produits/produits.service';
 import { OcrService } from './ocr.service';
 
-/** `POST /produits/:ean/ingredients/ocr` (multipart `image`) : la transcription nettoyée, SANS écriture. */
+/** `POST /produits/:ean/ingredients/ocr` (multipart `image`) : la transcription nettoyée, SANS écriture — d'où le 200, pas un 201. */
 @Controller('produits')
 export class OcrController {
   constructor(
@@ -19,6 +19,7 @@ export class OcrController {
   ) {}
 
   @Post(':ean/ingredients/ocr')
+  @HttpCode(200)
   @UseInterceptors(FileInterceptor('image', OPTIONS_IMAGE))
   async transcrire(@Param('ean') ean: string, @Req() req: Request, @UploadedFile() image?: FichierImage): Promise<TranscriptionOcr> {
     const img = imageRecue(image);

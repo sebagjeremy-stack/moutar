@@ -16,6 +16,15 @@ describe('nettoyage OCR (pur)', () => {
     expect(normaliserCodesE('lot de 2024, sucre 3 0 6, 250 g e')).toBe('lot de 2024, sucre 3 0 6, 250 g e');
     expect(normaliserCodesE('E100x')).toBe('E100x');
   });
+  it('ne recolle jamais un « E » de vitamine ni un « E » suivi d’une unité, et l’analyse n’y lit aucun code', () => {
+    const intacts = ['vitamine E 100 mg', 'Vitamine E 12 mg', 'vit. E 10 mg', 'LOT DE 2024', 'ÉNERGIE 250 kcal', 'CONTENANCE 500 ml', 'DE 120 g', 'valeur énergétique 1 046 kJ'];
+    for (const t of intacts) {
+      expect(normaliserCodesE(t)).toBe(t);
+      expect(extraireCodesE(nettoyerOcr(t))).toEqual([]);
+    }
+    // « E 1 2 0 » et « E 472 e » se lisent toujours, même près d'une vitamine ailleurs dans le texte.
+    expect(normaliserCodesE('vitamine E 100 mg, colorant : E 1 2 0, émulsifiant E 472 e')).toBe('vitamine E 100 mg, colorant : E120, émulsifiant E472e');
+  });
   it('recolle une césure en fin de ligne et remplace les retours à la ligne par une espace', () => {
     expect(recollerLignes('émul-\nsifiant : lécithine\nde SOJA')).toBe('émulsifiant : lécithine de SOJA');
     expect(recollerLignes('Saint-\nMichel')).toBe('Saint- Michel');

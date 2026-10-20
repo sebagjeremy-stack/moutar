@@ -86,6 +86,11 @@ export interface ResultatLectureLogo {
   /** Les symboles lus par le modèle qui ne correspondent à aucun certificateur du catalogue (l'utilisateur peut les signaler). */
   candidatsNonReconnus: string[];
   autresTextes: string[];
+  /**
+   * Le JETON de la proposition (16 octets aléatoires, base64url, 15 minutes, une validation) : la validation d'un clic le
+   * renvoie dans le corps, jamais dans l'adresse ; null quand rien n'est proposé. Il ne vaut que pour le produit de la lecture.
+   */
+  jeton: string | null;
 }
 
 /** La certification de niveau 1 d'un produit, VALIDÉE par l'utilisateur (verdict `cite`, source = le certificateur). */

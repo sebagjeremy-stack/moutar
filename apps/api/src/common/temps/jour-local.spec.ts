@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { debutDuJour, jourLocal } from './jour-local';
+import { debutDuJour, jourLocal, jourReel } from './jour-local';
 
 describe('jourLocal (le jour de la pendule du centre)', () => {
   it('rend un jour ISO AAAA-MM-JJ', () => {
@@ -25,5 +25,19 @@ describe('debutDuJour (minuit à la pendule du centre)', () => {
     const debut = debutDuJour('2026-03-29');
     expect(jourLocal(debut)).toBe('2026-03-29');
     expect(jourLocal(new Date(debut.getTime() - 1))).toBe('2026-03-28');
+  });
+});
+
+describe('jourReel (un jour du calendrier, sans Date)', () => {
+  it('accepte les jours réels, bissextiles compris ; refuse 2026-13-45, le 31 avril, le 29 février 2026, le 30 février 2024', () => {
+    expect(jourReel('2026-05-03')).toBe(true);
+    expect(jourReel('2024-02-29')).toBe(true);
+    expect(jourReel('2000-02-29')).toBe(true);
+    expect(jourReel('2026-13-45')).toBe(false);
+    expect(jourReel('2026-04-31')).toBe(false);
+    expect(jourReel('2026-02-29')).toBe(false);
+    expect(jourReel('1900-02-29')).toBe(false);
+    expect(jourReel('2026-00-10')).toBe(false);
+    expect(jourReel('03/05/2026')).toBe(false);
   });
 });

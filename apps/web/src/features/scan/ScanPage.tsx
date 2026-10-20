@@ -189,6 +189,7 @@ export function ScanPage() {
         setLecture({ phase: 'resultat', resultat: r.data });
         return;
       }
+      // Le résultat porte le JETON de la proposition (`r.data.jeton`) : il voyage dans `location.state`, jamais dans l'adresse.
       if (quoi === 'logo') {
         navigate(`/produit/${ean}/logo`, { replace: true, state: { resultat: r.data } });
         return;

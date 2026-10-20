@@ -73,7 +73,15 @@ export function calculerSynthese(lignesBrutes: LigneSynthese[], seuil: Niveau, a
   const compositionLue = composition?.composition ?? null;
   const perimee = lues.find((l) => l.statut === 'perime');
   const ton: Ton = 'warn';
+  // Lot 3 (correction du lot 2) : une marque citée sous une rubrique ÉTRANGÈRE au produit ne fonde pas un « permis » ;
+  // la ligne arrive `non_verifie` avec sa mention (« rubrique « X » : à vérifier »), et la synthèse le dit.
+  // Lot 5 : une contribution validée « douteux » (niveau 3) arrive de même `non_verifie` avec sa mention : la synthèse dit
+  // « Non vérifié · douteux », fondée sur la communauté — jamais un « non cacher » (Moutar cite, il ne décide pas).
+  const aVerifier = lues.find((l) => l.statut === 'non_verifie' && l.niveau !== 4 && l.mention);
+  const douteux = aVerifier?.niveau === 3;
   if (compositionLue && seuil === 4) {
+    // Au seuil 4, la composition donne la pastille, mais un « douteux » communautaire validé reste CITÉ dans la phrase.
+    const signale = douteux ? `, et ${aVerifier?.source ?? 'la communauté'} le signale douteux` : '';
     return {
       verdict: 'non_verifie',
       ton,
@@ -82,17 +90,11 @@ export function calculerSynthese(lignesBrutes: LigneSynthese[], seuil: Niveau, a
       niveauFondateur: 4,
       phrase:
         compositionLue === 'douteux'
-          ? 'Un additif de la composition est douteux ; aucune liste ni certification ne cite ce produit.'
-          : 'Aucun additif repéré, mais la composition seule ne garantit rien ; aucune liste ni certification ne cite ce produit.',
+          ? `Un additif de la composition est douteux ; aucune liste ni certification ne cite ce produit${signale}.`
+          : `Aucun additif repéré, mais la composition seule ne garantit rien ; aucune liste ni certification ne cite ce produit${signale}.`,
       proposerScanIngredients: false,
     };
   }
-  // Lot 3 (correction du lot 2) : une marque citée sous une rubrique ÉTRANGÈRE au produit ne fonde pas un « permis » ;
-  // la ligne arrive `non_verifie` avec sa mention (« rubrique « X » : à vérifier »), et la synthèse le dit.
-  // Lot 5 : une contribution validée « douteux » (niveau 3) arrive de même `non_verifie` avec sa mention : la synthèse dit
-  // « Non vérifié · douteux », fondée sur la communauté — jamais un « non cacher » (Moutar cite, il ne décide pas).
-  const aVerifier = lues.find((l) => l.statut === 'non_verifie' && l.niveau !== 4 && l.mention);
-  const douteux = aVerifier?.niveau === 3;
   return {
     verdict: 'non_verifie',
     ton,

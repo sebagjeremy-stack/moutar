@@ -6,15 +6,18 @@ import { ProduitsService } from './produits.service';
 /** Un EAN : 8 à 14 chiffres (EAN-8, EAN-13, GTIN-14). */
 export const schemaEan = z.string().regex(/^\d{8,14}$/, 'EAN attendu : 8 à 14 chiffres');
 
+/** Une liste d'ingrédients : 10 000 caractères au plus, partout (création, `PUT …/ingredients`, OCR, écran). */
+export const INGREDIENTS_MAX = 10_000;
+
 const videVersNull = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? null : v);
 const schemaCreation = z.object({
   ean: z.preprocess(videVersNull, schemaEan.nullable().optional()),
   nom: z.string().trim().min(1).max(200),
   marque: z.preprocess(videVersNull, z.string().trim().max(200).nullable().optional()),
-  ingredientsTexte: z.preprocess(videVersNull, z.string().trim().max(5000).nullable().optional()),
+  ingredientsTexte: z.preprocess(videVersNull, z.string().trim().max(INGREDIENTS_MAX).nullable().optional()),
 });
 /** Lot 3 : `source: 'ocr'` quand le texte vient d'une photo relue par l'utilisateur (la fiche passe `source: 'ocr'`). */
-const schemaIngredients = z.object({ ingredientsTexte: z.string().trim().min(1).max(5000), source: z.enum(['manuel', 'ocr']).default('manuel') });
+const schemaIngredients = z.object({ ingredientsTexte: z.string().trim().min(1).max(INGREDIENTS_MAX), source: z.enum(['manuel', 'ocr']).default('manuel') });
 
 @Controller('produits')
 export class ProduitsController {
