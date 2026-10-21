@@ -38,12 +38,13 @@ PWA React + Vite + Tailwind (direction visuelle fun et colorée, décidée le 20
 `certificateur` (code, nom, pays, logos, niveau de reconnaissance) · `produit` (ean, nom, marque, source OFF) · `verdict` (produit ou marque ou rubrique, niveau 1-4, rite, source, mention, date, valable_jusqu_au, statut) · `liste_officielle` + `import_liste` (fichier, date, lignes) · `additif` (E, nom, rite, statut, source) · `contribution` (utilisateur, verdict proposé, preuve, validé par).
 
 ## 7. Lots
-0. Cadrage + maquette HTML statique de la carte produit et de l'écran photo (GO sur maquette). **En cours.**
-1. Code-barres → Open Food Facts → analyse des additifs (niveau 4). Déjà utile seul.
-2. Import des listes Consistoire et Rav Wolff (niveau 2), recherche nom/marque, date de validité.
-3. Reconnaissance du logo par photo (niveau 1), catalogue de certificateurs, validation d'un clic.
-4. Dictée + texte, historique local.
-5. Contributions (niveau 3, LBPC) avec validation par un modérateur.
+0. Cadrage + maquette HTML statique de la carte produit et de l'écran photo. **Fait le 20/10/2026** (maquette sobre, puis direction fun et colorée).
+1. Code-barres → Open Food Facts → analyse des additifs (niveau 4) + console admin. **Fait le 20/10/2026.**
+2. Import des listes Consistoire et Rav Wolff (niveau 2), recherche nom/marque, date de validité. **Fait le 21/10/2026** (sur des échantillons fictifs ; vrais PDF à importer depuis le Mac).
+3. Reconnaissance du logo par photo (niveau 1), catalogue de certificateurs, validation d'un clic, OCR des ingrédients. **Fait le 21/10/2026** (vision OVH éprouvée en réel ; Claude branché, à comparer avec une clé).
+4. Dictée + texte, historique local, partage. **Fait le 21/10/2026.**
+5. Contributions (niveau 3, LBPC) avec validation à la console, signalements, tableau de bord. **Fait le 21/10/2026.**
+6. Clôture : suite e2e (25 tests), déploiement préparé (`deploy/`, rôle applicatif). **Fait le 21/10/2026 ; mise en ligne à décider (domaine, VPS).**
 
 ## 8. Décisions prises au GO (20/10/2026)
 1. Public : usage perso et famille, ouvert à quelques proches ; pas de compte pour chercher, compte simple pour contribuer ; pas de CGU ni de modération lourde en v1.

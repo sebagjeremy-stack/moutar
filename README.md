@@ -15,7 +15,7 @@ Webapp mobile d'abord : on photographie le produit (code-barres, logo de certifi
 - Cadrage : [`docs/cadrage.md`](docs/cadrage.md) · Règles : [`CLAUDE.md`](CLAUDE.md) · Fiches : [`docs/fonctionnalites/`](docs/fonctionnalites/README.md)
 - Maquettes HTML statiques : [`mockups/`](mockups/) (ouvrir `mockups/index.html`)
 
-État : lot 1 codé (code-barres → Open Food Facts → composition) + socle de la console d'administration ; lot 2 côté serveur (listes Consistoire et Rav Wolff importées à la console, recherche par nom ou marque, niveau 2 de la carte).
+État au 21/10/2026 : les cinq lots sont codés, relus et poussés (code-barres et composition, listes officielles, logo et OCR par IA, dictée / historique / partage, contributions et console) ; suite e2e verte ; déploiement préparé (`deploy/`), pas encore mis en ligne.
 
 ## Développement
 Prérequis : Node 22, pnpm 11, PostgreSQL 16 (`/usr/lib/postgresql/16/bin`, ou `PG_BIN=…`).
