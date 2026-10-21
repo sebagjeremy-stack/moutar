@@ -38,6 +38,12 @@ demarrer() {
     "$PG_BIN/createdb" -h "$SOCK" -p "$PORT" -U moutar moutar
     echo "Base « moutar » créée."
   fi
+  # Le rôle APPLICATIF de développement (`moutar_app`, mot de passe de dev `moutar_app` : l'API s'y connecte, DATABASE_URL
+  # de .env.example) ; ses droits se posent par `pnpm db:droits` après `pnpm db:migrate` (apps/api/src/database/droits-application.ts).
+  if ! "$PG_BIN/psql" -h "$SOCK" -p "$PORT" -U moutar -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='moutar_app'" | grep -q 1; then
+    "$PG_BIN/psql" -h "$SOCK" -p "$PORT" -U moutar -d postgres -q -c "CREATE ROLE moutar_app WITH LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD 'moutar_app'"
+    echo "Rôle applicatif « moutar_app » créé (développement)."
+  fi
 }
 
 case "${1:-start}" in

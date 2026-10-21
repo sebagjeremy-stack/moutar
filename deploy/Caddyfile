@@ -1,0 +1,86 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# Le port 80 ne fait que rediriger vers HTTPS (les défis ACME y restent servis par Caddy).
+http://{$DOMAINE} {
+	header -Server
+	redir https://{host}{uri} 308
+}
+
+{$DOMAINE} {
+	encode zstd gzip
+
+	# Les en-têtes de sécurité de TOUT le site. La CSP de l'écran : scripts et styles de l'application seulement
+	# ('unsafe-inline' sur les STYLES : Tailwind pose des styles en ligne, un style ne s'exécute pas) ; les images du
+	# produit viennent d'Open Food Facts (les deux hôtes que l'API autorise dans sa propre CSP, apps/api/src/main.ts), les
+	# aperçus de photo et le flux de la caméra sont des `blob:` ; aucune autre origine n'est appelée depuis le navigateur
+	# (Open Food Facts et le moteur d'IA sont appelés par l'API). Caméra et micro : l'application elle-même (code-barres,
+	# photo, dictée). Aucun moteur de recherche n'indexe (usage familial).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://images.openfoodfacts.org https://static.openfoodfacts.org; media-src 'self' blob:; worker-src 'self'; font-src 'self' data:; connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
+		Cross-Origin-Opener-Policy "same-origin"
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+		-Via
+		-X-Powered-By
+	}
+
+	# API NestJS (port 3100 dans le réseau du compose).
+	@api path /api/*
+	handle @api {
+		# Filet sous les bornes de chaque route (1 Mo de JSON, 10 Mo pour un fichier : apps/api/src/main.ts) : aucune
+		# requête plus grosse n'atteint l'API.
+		request_body {
+			max_size 12MB
+		}
+		# Rien de ce que sert l'API ne se met en cache : ni dans le navigateur, ni ailleurs (un verdict ne se garde pas).
+		header Cache-Control "no-store"
+		reverse_proxy api:3100
+	}
+
+	# Fichiers de l'application, nommés par leur empreinte : gardés un an. Un fichier disparu (ancien déploiement) répond
+	# 404 — pas index.html, sinon un ancien onglet reste sur une page blanche.
+	handle /assets/* {
+		root * /srv/web
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Le service worker et le manifeste de la PWA se revalident à chaque fois (c'est lui qui découvre une nouvelle version).
+	@pwa path /sw.js /manifest.webmanifest /registerSW.js /workbox-*.js
+	handle @pwa {
+		root * /srv/web
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	# Application React (routes côté client → index.html) : index.html n'est jamais servi depuis un cache sans
+	# revalidation, sinon un téléphone garde l'ancien code face à la nouvelle API.
+	handle {
+		root * /srv/web
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+
+	# Journal d'accès sur la sortie standard (journaux Docker, bornés par le compose). Aucune donnée personnelle ne
+	# transite par une adresse de Moutar (pas de compte pour chercher, pas de jeton dans l'URL) : rien à masquer ; la
+	# chaîne de requête (`?q=` : le nom d'un produit tapé) est tout de même retirée, par principe, et le Referer n'est pas
+	# écrit.
+	log {
+		output stdout
+		format filter {
+			wrap console
+			fields {
+				request>uri regexp "([?]).*" "${1}***"
+				request>headers>Referer delete
+			}
+		}
+	}
+}

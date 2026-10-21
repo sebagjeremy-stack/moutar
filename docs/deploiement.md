@@ -2,7 +2,26 @@
 
 Moutar ne porte aucune donnée de santé ni d'identité (cadrage § 8.4) : pas d'hébergement HDS. Un PostgreSQL managé ou une
 machine en Union européenne suffit. Ce qui suit vaut pour TOUTE migration et tout rôle de base, quel que soit l'hébergeur.
-Le cadrage complet de l'hébergement (fournisseur, sauvegardes, domaine) reste à ouvrir avec le pilote.
+
+## État (21/10/2026)
+- **Écrit, relu, jamais déployé** : `deploy/` (compose à quatre services `db` / `migrate` / `api` / `web`, deux Dockerfiles,
+  `Caddyfile`, `env.prod.example`, `scripts/deployer.sh`, `scripts/sauvegarde.sh`) et le runbook `deploy/README.md`.
+  `docker compose config -q` accepte la composition avec l'exemple d'environnement ; les images n'ont pas été construites
+  (pas de Docker dans la session qui les a écrites) ; `caddy validate` tourne à la construction de l'image web.
+- **Rôle applicatif posé et éprouvé sur la base locale** (voir « Rôles PostgreSQL ») : le reste bloquant de
+  `console-admin.md` est levé côté code ; en production, il le sera au premier passage de `migrate`.
+
+## Check-list avant la première mise en ligne
+1. Nom de domaine choisi, enregistrement `A` (et `AAAA`) vers le VPS ; `ACME_EMAIL` décidé.
+2. VPS OVH installé (Docker + Compose v2, rsync, pare-feu 22/80/443, SSH par clé) — `deploy/README.md`, « Prérequis ».
+3. `/srv/moutar/.env.prod` copié de `deploy/env.prod.example` et rempli (`POSTGRES_PASSWORD` tiré au hasard,
+   `IA_API_KEY` de OVHcloud AI Endpoints — ou `IA_BASE_URL` vidée —, `ADMIN_EMAIL_INITIAL`), mode 600.
+4. Images de base épinglées par leur empreinte (`deploy/README.md`, « Images de base ») — depuis un poste qui atteint le registre.
+5. `bash deploy/scripts/deployer.sh <hôte>` : `migrate` joue les migrations puis `db:droits` ; vérifier en SQL que
+   `moutar_app` n'est pas superutilisateur et n'a que SELECT/INSERT sur les journaux (requête dans le runbook).
+6. Compte admin créé par la graine (`seed-admin.ts` dans le conteneur `migrate`), mot de passe rangé.
+7. Sauvegarde en cron (03:15) ; décider la copie hors du serveur.
+8. Essai depuis le téléphone : scan d'un code-barres, carte produit, installation de la PWA, connexion à `/admin`.
 
 ## Migrations (Drizzle, `apps/api/src/database/migrations`)
 - Une migration tourne pendant que l'ancienne API sert encore : toute migration qui VERROUILLE une table (`ALTER TABLE`,

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { loadEnv } from '../config/env';
+import { chaineMigrations, loadEnv } from '../config/env';
 import { hacherMotDePasse } from '../modules/admin/mot-de-passe';
 import { creerDb } from './client';
 import { compteAdmin } from './schema';
@@ -14,7 +14,8 @@ async function main(): Promise<void> {
   const env = loadEnv();
   const email = env.ADMIN_EMAIL_INITIAL?.trim().toLowerCase();
   if (!email) throw new Error('ADMIN_EMAIL_INITIAL est absent du .env.');
-  const { pool, db } = creerDb(env.DATABASE_URL);
+  // Une graine se connecte avec le propriétaire (`DATABASE_URL_MIGRATIONS`), jamais avec le rôle applicatif.
+  const { pool, db } = creerDb(chaineMigrations(env));
   const [existant] = await db.select({ id: compteAdmin.id }).from(compteAdmin).where(eq(compteAdmin.email, email));
   if (existant) {
     console.log(`Le compte ${email} existe déjà : rien à faire.`);

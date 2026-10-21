@@ -14,9 +14,21 @@ function videVautAbsente<T extends z.ZodTypeAny>(schema: T) {
 const schemaEnv = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT_API: z.coerce.number().int().positive().default(3100),
+  /**
+   * Deux chaînes de connexion (20/10/2026, préparation de la mise en ligne) : `DATABASE_URL` est celle de l'API, avec le
+   * rôle APPLICATIF `moutar_app` (`database/droits-application.ts` : lit et écrit les tables, n'ajoute que des lignes
+   * aux journaux, ne touche pas au schéma) ; `DATABASE_URL_MIGRATIONS` est celle du PROPRIÉTAIRE des tables, réservée
+   * aux migrations, aux graines et à `db:droits` (`chaineMigrations`). En développement, elles peuvent être égales ; en
+   * production, `refusDemarrage` refuse que l'API tourne avec le propriétaire.
+   */
   DATABASE_URL: z.string().min(1, 'DATABASE_URL est requis'),
+  DATABASE_URL_MIGRATIONS: videVautAbsente(z.string().min(1).optional()),
+  /** Le mot de passe du rôle applicatif, lu par `db:droits` pour créer `moutar_app` ou le lui remettre ; jamais écrit nulle part. */
+  MOUTAR_APP_PASSWORD: videVautAbsente(z.string().min(1).optional()),
   // Pas de SESSION_SECRET : le jeton de session de la console est ALÉATOIRE (32 octets) et gardé HACHÉ en base ; le cookie
   // ne porte que ce jeton, rien n'est signé (`modules/admin/session-admin.ts`). Retiré le 20/10/2026.
+  // Pas de COOKIE_SECURE non plus : le cookie de la console est `Secure` dès que NODE_ENV=production (`admin.controller.ts`),
+  // implicitement — derrière Caddy, tout est HTTPS (deploy/Caddyfile).
   /** Lot 3 : deux fournisseurs derrière un seul module `ia` (CLAUDE.md, 20/10/2026) ; OVH par défaut. */
   IA_FOURNISSEUR: z.enum(['ovh', 'anthropic']).default('ovh'),
   ANTHROPIC_API_KEY: videVautAbsente(z.string().min(1).optional()),
@@ -38,6 +50,9 @@ const schemaEnv = z.object({
 
 export type Env = z.infer<typeof schemaEnv>;
 
+/** Les noms de TOUTES les variables du schéma : `deploy/env.prod.example` doit les citer (`env-prod-example.spec.ts`). */
+export const CLES_ENV: readonly string[] = Object.keys(schemaEnv.shape);
+
 /** Les hôtes autorisés pour le moteur d'IA : la liste déclarée, exacte. */
 export function hotesAutorises(env: Pick<Env, 'IA_HOTES_AUTORISES'>): string[] {
   return (env.IA_HOTES_AUTORISES ?? '')
@@ -53,8 +68,50 @@ export function hotesPreuve(env: Pick<Env, 'CONTRIBUTION_HOTES_PREUVE'>): string
     .filter((h) => h.length > 0);
 }
 
+/** Le rôle (utilisateur) d'une chaîne PostgreSQL, ou null si la chaîne ne se lit pas comme une URL. */
+export function roleDeLaChaine(chaine: string): string | null {
+  try {
+    const role = decodeURIComponent(new URL(chaine).username);
+    return role.length > 0 ? role : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pure : en production, le refus de tourner avec le rôle PROPRIÉTAIRE de la base, ou null. Heuristique : `DATABASE_URL`
+ * est la même chaîne que `DATABASE_URL_MIGRATIONS`, ou porte le même rôle. Le conteneur de l'API ne reçoit pas
+ * `DATABASE_URL_MIGRATIONS` (deploy/docker-compose.yml) : la vérité se relit alors en base au démarrage
+ * (`verifierRoleApplicatif`, `database/droits-application.ts` : un superutilisateur est refusé).
+ */
+export function refusRoleProprietaire(env: Pick<Env, 'NODE_ENV' | 'DATABASE_URL' | 'DATABASE_URL_MIGRATIONS'>): string | null {
+  if (env.NODE_ENV !== 'production' || !env.DATABASE_URL_MIGRATIONS) return null;
+  const conseil = "l'API doit se connecter avec le rôle applicatif « moutar_app » (pnpm --filter @moutar/api db:droits), le propriétaire ne servant qu'aux migrations : l'API refuse de démarrer.";
+  if (env.DATABASE_URL === env.DATABASE_URL_MIGRATIONS) return `En production, DATABASE_URL est identique à DATABASE_URL_MIGRATIONS (le rôle propriétaire) ; ${conseil}`;
+  const roleApi = roleDeLaChaine(env.DATABASE_URL);
+  const roleProprietaire = roleDeLaChaine(env.DATABASE_URL_MIGRATIONS);
+  if (roleApi && roleProprietaire && roleApi === roleProprietaire) {
+    return `En production, DATABASE_URL porte le rôle propriétaire « ${roleProprietaire} » (celui de DATABASE_URL_MIGRATIONS) ; ${conseil}`;
+  }
+  return null;
+}
+
+/**
+ * La chaîne des MIGRATIONS, des graines et de `db:droits` : le propriétaire (`DATABASE_URL_MIGRATIONS`), sinon
+ * `DATABASE_URL` en développement et en test (un poste où les deux rôles se confondent) ; en production, elle est exigée.
+ */
+export function chaineMigrations(env: Pick<Env, 'NODE_ENV' | 'DATABASE_URL' | 'DATABASE_URL_MIGRATIONS'>): string {
+  if (env.DATABASE_URL_MIGRATIONS) return env.DATABASE_URL_MIGRATIONS;
+  if (env.NODE_ENV === 'production') {
+    throw new Error('En production, les migrations exigent DATABASE_URL_MIGRATIONS (le rôle propriétaire de la base) : rien n’a été appliqué.');
+  }
+  return env.DATABASE_URL;
+}
+
 /** Pure : le refus qui empêche le démarrage, ou null. */
 export function refusDemarrage(env: Env): string | null {
+  const proprietaire = refusRoleProprietaire(env);
+  if (proprietaire) return proprietaire;
   if (env.IA_BASE_URL) {
     const hote = new URL(env.IA_BASE_URL).hostname.toLowerCase();
     if (!hotesAutorises(env).includes(hote)) {

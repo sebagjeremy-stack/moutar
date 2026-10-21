@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validerEnv } from './env';
+import { chaineMigrations, refusRoleProprietaire, roleDeLaChaine, validerEnv } from './env';
 
 const base = { DATABASE_URL: 'postgres://x' };
 
@@ -40,5 +40,40 @@ describe('validerEnv', () => {
   });
   it('une variable vide vaut absente', () => {
     expect(validerEnv({ ...base, IA_BASE_URL: '', ADMIN_EMAIL_INITIAL: '' }).IA_BASE_URL).toBeUndefined();
+  });
+
+  describe('deux chaînes de base (20/10/2026) : l’API en moutar_app, les migrations avec le propriétaire', () => {
+    const app = 'postgres://moutar_app:secret@db:5432/moutar';
+    const proprietaire = 'postgres://moutar:autre@db:5432/moutar';
+
+    it('en production, refuse DATABASE_URL identique à DATABASE_URL_MIGRATIONS, avec un message qui dit quoi faire', () => {
+      expect(() => validerEnv({ NODE_ENV: 'production', DATABASE_URL: proprietaire, DATABASE_URL_MIGRATIONS: proprietaire })).toThrow(/identique à DATABASE_URL_MIGRATIONS.*moutar_app.*db:droits/);
+    });
+    it('en production, refuse aussi le MÊME RÔLE sous deux chaînes différentes', () => {
+      const refus = refusRoleProprietaire({ NODE_ENV: 'production', DATABASE_URL: 'postgres://moutar:x@db:5432/moutar?sslmode=disable', DATABASE_URL_MIGRATIONS: proprietaire });
+      expect(refus).toMatch(/rôle propriétaire « moutar »/);
+    });
+    it('en production, accepte le rôle applicatif ; et sans DATABASE_URL_MIGRATIONS (conteneur de l’API), ne juge pas', () => {
+      expect(validerEnv({ NODE_ENV: 'production', DATABASE_URL: app, DATABASE_URL_MIGRATIONS: proprietaire }).DATABASE_URL).toBe(app);
+      expect(refusRoleProprietaire({ NODE_ENV: 'production', DATABASE_URL: proprietaire, DATABASE_URL_MIGRATIONS: undefined })).toBeNull();
+      expect(validerEnv({ NODE_ENV: 'production', DATABASE_URL: proprietaire, DATABASE_URL_MIGRATIONS: '' }).DATABASE_URL_MIGRATIONS).toBeUndefined();
+    });
+    it('en développement, les deux chaînes peuvent être égales', () => {
+      expect(validerEnv({ NODE_ENV: 'development', DATABASE_URL: proprietaire, DATABASE_URL_MIGRATIONS: proprietaire }).DATABASE_URL).toBe(proprietaire);
+    });
+    it('chaineMigrations : le propriétaire, sinon DATABASE_URL hors production, exigé en production', () => {
+      expect(chaineMigrations({ NODE_ENV: 'development', DATABASE_URL: app, DATABASE_URL_MIGRATIONS: proprietaire })).toBe(proprietaire);
+      expect(chaineMigrations({ NODE_ENV: 'development', DATABASE_URL: proprietaire, DATABASE_URL_MIGRATIONS: undefined })).toBe(proprietaire);
+      expect(() => chaineMigrations({ NODE_ENV: 'production', DATABASE_URL: app, DATABASE_URL_MIGRATIONS: undefined })).toThrow(/DATABASE_URL_MIGRATIONS/);
+    });
+    it('roleDeLaChaine lit le rôle, décodé, et rend null sur une chaîne illisible', () => {
+      expect(roleDeLaChaine('postgres://moutar%5Fapp:x@h/db')).toBe('moutar_app');
+      expect(roleDeLaChaine('pas une url')).toBeNull();
+      expect(roleDeLaChaine('postgres://h/db')).toBeNull();
+    });
+    it('MOUTAR_APP_PASSWORD vide vaut absent (jamais écrit, seulement lu par db:droits)', () => {
+      expect(validerEnv({ ...base, MOUTAR_APP_PASSWORD: '' }).MOUTAR_APP_PASSWORD).toBeUndefined();
+      expect(validerEnv({ ...base, MOUTAR_APP_PASSWORD: 'x' }).MOUTAR_APP_PASSWORD).toBe('x');
+    });
   });
 });

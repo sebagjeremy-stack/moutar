@@ -1,0 +1,167 @@
+# Moutar — pile de production sur une machine (VPS OVH, Union européenne ; aucune donnée de santé ni d'identité : pas de HDS).
+# Lancement (sur le serveur) : docker compose --env-file /srv/moutar/.env.prod up -d --build
+# Données persistantes dans /srv/moutar (base, sauvegardes, secrets) ; le code dans /srv/moutar/app (deploy/scripts/deployer.sh).
+# `MOUTAR_DIR` (défaut /srv/moutar) se lit dans l'environnement du shell ou dans le fichier `--env-file`.
+name: moutar
+
+# Conteneurs durcis : aucun processus ne regagne un privilège, des plafonds de mémoire et de processus (au-dessus de
+# l'usage normal : ils empêchent seulement qu'un conteneur emballé emporte le serveur).
+x-durci: &durci
+  security_opt: ["no-new-privileges:true"]
+
+x-journaux: &journaux
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+# L'image de l'API sert à deux services : `migrate` (rôle PROPRIÉTAIRE, puis s'arrête) et `api` (rôle applicatif).
+x-image-api: &image-api
+  image: moutar-api
+  build:
+    context: ..
+    dockerfile: deploy/api.Dockerfile
+
+services:
+  db:
+    # PostgreSQL 16 (à épingler par son empreinte à la première mise en ligne : deploy/README.md, « Images de base »).
+    image: postgres:16-alpine
+    restart: unless-stopped
+    command:
+      - postgres
+      # Les colonnes `date` des listes sont des jours à la pendule de Paris (docs/deploiement.md).
+      - -c
+      - timezone=Europe/Paris
+      - -c
+      - log_timezone=Europe/Paris
+      # Petite machine, usage familial : l'API ouvre 10 connexions au plus (apps/api/src/database/client.ts).
+      - -c
+      - max_connections=50
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      # Une erreur se dit SANS la ligne fautive (par défaut, une contrainte violée écrit la ligne entière dans le journal).
+      - -c
+      - log_error_verbosity=terse
+      - -c
+      - log_min_duration_statement=500ms
+    environment:
+      TZ: Europe/Paris
+      POSTGRES_USER: moutar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env.prod}
+      POSTGRES_DB: moutar
+    volumes:
+      - ${MOUTAR_DIR:-/srv/moutar}/pgdata:/var/lib/postgresql/data
+    shm_size: 128m
+    <<: [*durci, *journaux]
+    pids_limit: 256
+    mem_limit: 1g
+    networks: [interne]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moutar -d moutar"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Les migrations Drizzle puis les droits du rôle applicatif, avec le rôle PROPRIÉTAIRE `moutar` : ce conteneur est le
+  # SEUL à porter son mot de passe et celui de `moutar_app` ; il migre, pose les droits, puis s'arrête ; l'API ne démarre
+  # qu'après sa réussite. Il sert aussi à la graine du compte admin et aux commandes de secours :
+  #   docker compose --env-file /srv/moutar/.env.prod run --rm migrate ./node_modules/.bin/tsx src/database/seed-admin.ts
+  migrate:
+    <<: [*image-api, *durci, *journaux]
+    restart: "no"
+    command: ["sh", "-c", "./node_modules/.bin/tsx src/database/migrate.ts && ./node_modules/.bin/tsx src/database/droits.ts"]
+    # La sonde de l'image (GET /health) vise l'API : sans objet pour un conteneur qui migre et s'arrête.
+    healthcheck:
+      disable: true
+    env_file:
+      - ${MOUTAR_DIR:-/srv/moutar}/.env.prod
+    environment:
+      TZ: Europe/Paris
+      NODE_ENV: production
+      DATABASE_URL: postgres://moutar_app:${MOUTAR_APP_PASSWORD:?MOUTAR_APP_PASSWORD manquant dans .env.prod (deployer.sh l ajoute)}@db:5432/moutar
+      DATABASE_URL_MIGRATIONS: postgres://moutar:${POSTGRES_PASSWORD}@db:5432/moutar
+      MOUTAR_APP_PASSWORD: ${MOUTAR_APP_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [interne]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp
+    pids_limit: 128
+    mem_limit: 512m
+
+  api:
+    <<: [*image-api, *durci, *journaux]
+    restart: unless-stopped
+    env_file:
+      - ${MOUTAR_DIR:-/srv/moutar}/.env.prod
+    environment:
+      TZ: Europe/Paris
+      NODE_ENV: production
+      PORT_API: "3100"
+      # Deux rôles : l'API tourne en `moutar_app`, qui ne peut ni réécrire ni effacer un journal ni toucher au schéma
+      # (apps/api/src/database/droits-application.ts). Elle ne connaît pas le mot de passe du propriétaire : les valeurs
+      # VIDES ci-dessous écrasent celles du fichier d'environnement (`environment` l'emporte sur `env_file`), et l'API
+      # vérifie à son démarrage que son rôle n'est pas superutilisateur (`verifierRoleApplicatif`).
+      DATABASE_URL: postgres://moutar_app:${MOUTAR_APP_PASSWORD:?MOUTAR_APP_PASSWORD manquant dans .env.prod (deployer.sh l ajoute)}@db:5432/moutar
+      DATABASE_URL_MIGRATIONS: ""
+      POSTGRES_PASSWORD: ""
+      MOUTAR_APP_PASSWORD: ""
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [interne]
+    expose:
+      - "3100"
+    # Aucune capacité (port 3100, utilisateur 10001), système de fichiers en lecture seule hors de /tmp (cache de tsx).
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    pids_limit: 256
+    mem_limit: 768m
+
+  web:
+    image: moutar-web
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    <<: [*durci, *journaux]
+    restart: unless-stopped
+    environment:
+      DOMAINE: ${DOMAINE:?DOMAINE manquant dans .env.prod}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL manquant dans .env.prod}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_started
+    networks: [interne]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    pids_limit: 128
+    mem_limit: 256m
+    healthcheck:
+      # L'interface d'administration de Caddy (localhost du conteneur seulement) répond dès qu'il sert.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# Un seul réseau, propre au compose : seule `web` publie des ports ; `db` et `api` ne sont joignables que par leur nom.
+networks:
+  interne:
+
+volumes:
+  caddy_data:
+  caddy_config:
