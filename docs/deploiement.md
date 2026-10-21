@@ -48,3 +48,6 @@ machine en Union européenne suffit. Ce qui suit vaut pour TOUTE migration et to
   l'état relu sous le verrou (listes : `liste:<code>` à l'import et à l'activation ; contributions : `produit:<id>`).
 - « Un seul vivant » se garantit en plus par un index unique partiel (`liste_officielle_active_par_code_idx`) ; la violation
   (`23505`) devient un 409 explicite (`import_concurrent`), jamais une 500.
+
+## Serveur de test (décision du 21/10/2026)
+VPS OVH `vps-a1e7574f.vps.ovh.ca`, centre de Beauharnois (Canada), Debian 13, utilisateur `debian` (pas `root`) ; sous-domaine prévu : `moutar.1jour1saveur.fr`. Le médecin-utilisateur garde ce VPS hors Union européenne en connaissance de cause : Moutar ne porte ni donnée de santé ni identité, et le Canada bénéficie d'une décision d'adéquation au RGPD. Déploiement : `MOUTAR_SSH_UTILISATEUR=debian bash deploy/scripts/deployer.sh moutar.1jour1saveur.fr` (l'utilisateur `debian` doit être dans le groupe `docker` et posséder `/srv/moutar`).
