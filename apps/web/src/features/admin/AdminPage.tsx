@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
-import type { Additif, Produit, StatutAdditif, Ton } from '@moutar/shared-types';
+import type { Additif, EtatSessionConsole, Produit, StatutAdditif, Ton } from '@moutar/shared-types';
 import { Bandeau } from '../../components/Bandeau';
 import { Bouton } from '../../components/Bouton';
 import { Champ } from '../../components/Champ';
 import { Pastille } from '../../components/Pastille';
 import { appel, envoyer, lire } from '../../lib/api';
 import { formaterJour } from '../../lib/dates';
+import { pluriel } from '../../lib/texte';
 import { Certificateurs } from './Certificateurs';
 import { Contributions } from './Contributions';
 import { JournalIa } from './JournalIa';
+import { JournalProduits } from './JournalProduits';
+import { entreesDetail } from './journal-regles';
 import { EtatNonLu, useLecture } from './lecture';
 import { ListeDetail, Listes } from './Listes';
 import { Signalements } from './Signalements';
@@ -32,7 +35,7 @@ interface LigneJournal {
   email: string | null;
 }
 
-type Onglet = 'tableau' | 'contributions' | 'signalements' | 'additifs' | 'certificateurs' | 'listes' | 'produits' | 'journal' | 'journal-ia';
+type Onglet = 'tableau' | 'contributions' | 'signalements' | 'additifs' | 'certificateurs' | 'listes' | 'produits' | 'journal' | 'journal-ia' | 'journal-produits';
 const ONGLETS: ReadonlyArray<[Onglet, string, string]> = [
   ['tableau', 'Tableau de bord', '/admin'],
   ['contributions', 'Contributions', '/admin/contributions'],
@@ -43,6 +46,7 @@ const ONGLETS: ReadonlyArray<[Onglet, string, string]> = [
   ['produits', 'Produits', '/admin/produits'],
   ['journal', 'Journal', '/admin/journal'],
   ['journal-ia', 'Journal IA', '/admin/journal-ia'],
+  ['journal-produits', 'Journal produits', '/admin/journal-produits'],
 ];
 
 /** L'onglet se lit dans l'adresse (`/admin` = le tableau de bord, `/admin/contributions`, `/admin/additifs`…) : un lien y mène. */
@@ -58,9 +62,10 @@ const TON_STATUT: Record<StatutAdditif, Ton> = { casher: 'ok', douteux: 'warn', 
 export function AdminPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
+  // `GET /admin/moi` répond 200 dans tous les cas (`{ connecte: false }` sans session) : jamais un 401 avant la connexion.
   const relire = useCallback(async () => {
-    const r = await lire<Session>('/api/v1/admin/moi');
-    setSession(r.ok ? r.data : null);
+    const r = await lire<EtatSessionConsole>('/api/v1/admin/moi');
+    setSession(r.ok && r.data.connecte ? { email: r.data.email, nom: r.data.nom } : null);
   }, []);
 
   useEffect(() => {
@@ -195,6 +200,8 @@ function OngletCourant({ onglet, surRefus }: { onglet: Onglet; surRefus: (s: num
       return <Journal surRefus={surRefus} />;
     case 'journal-ia':
       return <JournalIa surRefus={surRefus} />;
+    case 'journal-produits':
+      return <JournalProduits surRefus={surRefus} />;
   }
 }
 
@@ -210,7 +217,7 @@ function Additifs({ surRefus }: { surRefus: (s: number) => void }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 id="titre-additifs" className="text-17 font-semibold">
-            Additifs · {etat.data.length} lignes
+            Additifs · {pluriel(etat.data.length, 'ligne', 'lignes')}
           </h1>
           <p className="muet">Le catalogue en code, et sa surcharge (statut, source, note). Chaque enregistrement s’écrit au journal.</p>
         </div>
@@ -318,7 +325,7 @@ function Produits({ surRefus }: { surRefus: (s: number) => void }) {
                 {p.marque ? <span className="muet"> · {p.marque}</span> : null}
               </span>
               <span className="muet">
-                {p.ean ?? 'sans EAN'} · {p.source === 'off' ? 'Open Food Facts' : p.source === 'manuel' ? 'manuel' : 'OCR'} · lu le {formaterJour(p.luLe)} · {p.additifs.length} additif{p.additifs.length > 1 ? 's' : ''}
+                {p.ean ?? 'sans EAN'} · {p.source === 'off' ? 'Open Food Facts' : p.source === 'manuel' ? 'manuel' : 'OCR'} · lu le {formaterJour(p.luLe)} · {pluriel(p.additifs.length, 'additif', 'additifs')}
               </span>
             </li>
           ))}
@@ -335,7 +342,7 @@ function Journal({ surRefus }: { surRefus: (s: number) => void }) {
   return (
     <section className="carte" aria-labelledby="titre-journal">
       <h1 id="titre-journal" className="text-17 font-semibold">
-        Journal · {etat.data.length} dernières lignes
+        Journal · {pluriel(etat.data.length, 'dernière ligne', 'dernières lignes')}
       </h1>
       <p className="muet">En ajout seul : rien ne s’y modifie ni ne s’y efface.</p>
       {etat.data.length === 0 ? (
@@ -347,12 +354,29 @@ function Journal({ surRefus }: { surRefus: (s: number) => void }) {
               <span className="muet w-[130px]">{quand.format(new Date(l.createdAt))}</span>
               <span className="font-semibold">{l.action}</span>
               {l.objet ? <span>{l.objet}</span> : null}
-              <span className="muet min-w-0 flex-1 break-words">{Object.keys(l.detail).length ? JSON.stringify(l.detail) : ''}</span>
+              <DetailJournal detail={l.detail} />
               <span className="muet">{l.email ?? '—'}</span>
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+/** Le détail d'une ligne du journal en « clé : valeur » lisibles (objets aplatis, six entrées puis « … ») — jamais du JSON brut. */
+function DetailJournal({ detail }: { detail: Record<string, unknown> }) {
+  const { entrees, tronque } = entreesDetail(detail);
+  if (entrees.length === 0) return <span className="min-w-0 flex-1" />;
+  return (
+    <dl className="m-0 flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-0">
+      {entrees.map(([cle, valeur]) => (
+        <div key={cle} className="flex min-w-0 gap-1">
+          <dt className="muet">{cle} :</dt>
+          <dd className="m-0 min-w-0 break-words">{valeur}</dd>
+        </div>
+      ))}
+      {tronque ? <span className="muet">…</span> : null}
+    </dl>
   );
 }

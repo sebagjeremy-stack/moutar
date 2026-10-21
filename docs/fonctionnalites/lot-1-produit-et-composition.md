@@ -1,6 +1,6 @@
 # Lot 1 — Code-barres → Open Food Facts → analyse de la composition (niveau 4)
 
-Squelette du monorepo et premier lot, 20/10/2026. Rien n'est commité par la session : le pilote relit et commite.
+Squelette du monorepo et premier lot, 20/10/2026 ; commité et poussé (`main`). 21/10/2026 : limites de débit par adresse sur les écritures publiques (`POST /produits` et `PUT …/ingredients` 30/h, `GET …/analyse` 120/10 min, appel Open Food Facts pour un EAN inconnu 60/10 min — jamais la lecture d'une fiche en cache ; `modules/produits/limite-produits.ts`), et trace de chaque création manuelle et réécriture des ingrédients dans `journal_produit` (migration `0006`, ajout seul, empreinte SHA-256 et longueur — jamais le texte ; lisible à la console, onglet « Journal produits », `GET /admin/journal-produits?page=`).
 
 ## Décisions
 - **Monorepo pnpm** : `apps/api` (NestJS 10 + Drizzle + pg + zod, `tsx` pour lire le TypeScript du paquet partagé : `--require tsx/cjs` dans `nest-cli.json`), `apps/web` (React 18 + Vite + Tailwind 3.4 + react-router, PWA par `vite-plugin-pwa`), `packages/shared-types` (types du contrat, règles pures `src/regles/`, catalogues `src/catalogues/`, résolu via `src/` sans build). Tests : **vitest** partout (l'API aussi, comme Kora : les gardes se testent avec un service simulé, sans injection Nest).
@@ -41,3 +41,6 @@ Squelette du monorepo et premier lot, 20/10/2026. Rien n'est commité par la ses
 4. Les lignes du catalogue d'additifs (nombre : voir `additifs.ts`), une par une, depuis la console.
 5. « viande », « bœuf », « veau », « agneau », « poulet », « volaille », « dinde », « fromage » en douteux (« viande ou fromage non certifiés ») ; « jambon » en « charcuterie » non cacher.
 6. Seuil 4 + liste périmée + composition douteuse → « Non vérifié · additif douteux ».
+
+## État (21/10/2026)
+Commité et poussé sur `main` ; non déployé.

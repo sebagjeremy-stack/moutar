@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import type { LigneJournalIa, PageJournalIa } from '@moutar/shared-types';
 import { Pastille } from '../../components/Pastille';
+import { pluriel } from '../../lib/texte';
 import { EtatNonLu, useLecture } from './lecture';
 import type { Refus } from './outils';
 
@@ -33,7 +34,7 @@ export function JournalIa({ surRefus }: { surRefus: Refus }) {
         </Link>
       ) : null}
       <span className="muet">
-        Page {page} sur {pages} · {total.toLocaleString('fr-FR')} ligne{total > 1 ? 's' : ''}
+        Page {page} sur {pages} · {pluriel(total, 'ligne', 'lignes')}
       </span>
       {page < pages ? (
         <Link to={`/admin/journal-ia?page=${page + 1}`} className="btn min-h-[40px]">
@@ -47,7 +48,7 @@ export function JournalIa({ surRefus }: { surRefus: Refus }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 id="titre-journal-ia" className="text-17 font-semibold">
-            Journal IA · {total.toLocaleString('fr-FR')} appel{total > 1 ? 's' : ''} au moteur
+            Journal IA · {pluriel(total, 'appel', 'appels')} au moteur
           </h1>
           <p className="muet">En ajout seul, sans contenu : ni image, ni texte, ni identité n’y sont gardés — des durées, des codes et des comptes de jetons.</p>
         </div>

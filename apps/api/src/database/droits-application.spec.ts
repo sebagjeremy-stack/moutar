@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { JOURNAUX, ROLE_APPLICATIF, estJournal, identifiantSur, ordreRole, ordresDroits, verificateurScram } from './droits-application';
 
-const TABLES = ['produit', 'verdict', 'journal_admin', 'journal_ia', 'compte_admin', 'session_admin', 'liste_officielle', 'ligne_liste'];
+const TABLES = ['produit', 'verdict', 'journal_admin', 'journal_ia', 'journal_produit', 'compte_admin', 'session_admin', 'liste_officielle', 'ligne_liste'];
 
 describe('ordresDroits (le SQL du rôle applicatif, sans base)', () => {
   const ordres = ordresDroits(ROLE_APPLICATIF, TABLES);
 
   it('ne donne sur un journal que SELECT et INSERT — jamais UPDATE, DELETE ni TRUNCATE', () => {
-    for (const journal of ['journal_admin', 'journal_ia']) {
+    for (const journal of ['journal_admin', 'journal_ia', 'journal_produit']) {
       const surLeJournal = ordres.filter((o) => o.includes(`public."${journal}"`));
       expect(surLeJournal).toEqual([
         `REVOKE ALL ON TABLE public."${journal}" FROM "moutar_app"`,
@@ -31,10 +31,10 @@ describe('ordresDroits (le SQL du rôle applicatif, sans base)', () => {
     expect(ordres.some((o) => o.includes('GRANT CREATE'))).toBe(false);
   });
 
-  it('un journal futur est protégé par son seul nom (journal_*), et la liste déclarée couvre les deux journaux du schéma', () => {
+  it('un journal futur est protégé par son seul nom (journal_*), et la liste déclarée couvre les trois journaux du schéma', () => {
     expect(estJournal('journal_contributions')).toBe(true);
     expect(estJournal('produit')).toBe(false);
-    expect(JOURNAUX.map((j) => j.table).sort()).toEqual(['journal_admin', 'journal_ia']);
+    expect(JOURNAUX.map((j) => j.table).sort()).toEqual(['journal_admin', 'journal_ia', 'journal_produit']);
     const avecNouveau = ordresDroits(ROLE_APPLICATIF, ['journal_nouveau']);
     expect(avecNouveau).toContain('GRANT SELECT, INSERT ON TABLE public."journal_nouveau" TO "moutar_app"');
     expect(avecNouveau.some((o) => o.includes('journal_nouveau') && /UPDATE|DELETE/.test(o) && o.startsWith('GRANT'))).toBe(false);

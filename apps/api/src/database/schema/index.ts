@@ -6,3 +6,4 @@ export * from './listes';
 export * from './reserve';
 export * from './contribution';
 export * from './journal-ia';
+export * from './journal-produit';

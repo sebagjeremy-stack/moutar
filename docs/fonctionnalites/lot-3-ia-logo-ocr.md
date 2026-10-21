@@ -1,6 +1,6 @@
 # Lot 3 — Module d'IA à deux fournisseurs, logo de certification par photo (niveau 1), OCR des ingrédients
 
-Côté serveur, 20/10/2026 (`apps/api`, `packages/shared-types`), commité (`57e0f28`) ; écrans (`apps/web`) faits le même jour sur le contrat JSON du § « Contrat pour le web », commités (`a364422`). **Corrections de la relecture critique des lots 3-5 (21/10/2026)** : § « Relecture », codées et testées, non commitées.
+Côté serveur, 20/10/2026 (`apps/api`, `packages/shared-types`), commité (`57e0f28`) ; écrans (`apps/web`) faits le même jour sur le contrat JSON du § « Contrat pour le web », commités (`a364422`). **Corrections de la relecture critique des lots 3-5 (21/10/2026)** : § « Relecture », codées, testées et commitées.
 
 ## Décisions
 - **Un seul module `ia`** (`modules/ia`) : `FournisseurIa` { `lireImage(image, consigne, schemaZod)`, `transcrire(audio)` }, deux fournisseurs interchangeables choisis par `IA_FOURNISSEUR` :
@@ -91,7 +91,7 @@ Nouvelle pastille possible de `lignes[1]` : « Cité dans une autre rubrique · 
 - `journal_ia` : trois lignes (deux `lecture_logo` ok avec jetons, une `ocr_ingredients` en échec `moteur_sature`), DELETE et TRUNCATE refusés par les déclencheurs.
 - Tests : API 193 (type-image 3, image reçue 3, extraction JSON 3, OVH 8, Anthropic 4, moteur 8, limite 1, correspondance 13, nettoyage OCR 9, carte 17), paquet partagé 36, web 46 (inchangé) ; typecheck des trois paquets ; migration `0003_ia` appliquée. (Après la relecture du 21/10/2026 : API 307, partagé 40, web 79.)
 
-## Relecture critique des lots 3-5 (21/10/2026) — corrections, non commitées
+## Relecture critique des lots 3-5 (21/10/2026) — corrections, commitées
 - Réponses du modèle TRONQUÉES, jamais refusées (ci-dessus) ; `max_tokens` 4096 chez OVH comme chez Claude ; `FournisseurIa.modeleParDefaut` dans le contrat (plus de cast dans `moteur-ia.ts` pour la ligne d'échec du journal) ; le commentaire de `journal_ia.erreur` cite les vrais codes (`CodeErreurIa`, pas de `delai_depasse`).
 - Jeton de proposition, mentions contradictoires, `texteLu` en texte brut (200), transaction sous verrou + index unique partiel (migration 0005), limite 10/h/adresse sur `POST` et `DELETE` certification ; lectures sans écriture en **200** (`POST …/logo`, `POST /logos/lire`, `POST …/ingredients/ocr`).
 - Nettoyage OCR : lookbehind Unicode, vitamine E et unités protégées (partagé avec `extraireCodesE`).
@@ -148,3 +148,6 @@ Fait sur le contrat ci-dessus, sans toucher l'API ni le paquet partagé (types `
 4. Limite de 30 lectures d'image par 10 minutes et par adresse ; 8 Mo par image, sans recompression serveur.
 5. Correction du lot 2 (choix 2) : « Cité dans une autre rubrique · à vérifier » en ambre, synthèse « Non vérifié · à vérifier ».
 6. `IA_BASE_URL` vide n'empêche plus le démarrage (503 `moteur_non_configure` sur les routes IA seulement).
+
+## État (21/10/2026)
+Commité et poussé sur `main` ; non déployé.

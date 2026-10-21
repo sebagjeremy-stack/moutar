@@ -25,5 +25,5 @@ La direction « fun et colorée » (CLAUDE.md) est appliquée à `apps/web` à p
 - **Choix** : les accents n'apparaissent QUE sur des éléments décoratifs (numéros, boutons d'action, fonds de carte, viseur) ; le corail du bouton principal reste clair, à texte sombre, pour ne jamais se confondre avec le rouge réservé ; les titres passent en police ronde du système sans téléchargement.
 - **Écarts et restes** : l'accueil de la maquette montre « Tout voir » et la recherche par nom (lot 2 / lot 4) : non repris, le code reste au code-barres ; le bouton « Partager » de la carte n'existe pas (lot 4) ; le viseur du scan n'était pas maquetté (dessiné directement, à valider) ; la carte « Mon seuil » n'était pas maquettée (quatre cartes colorées, à valider) ; en bac à sable, Open Food Facts est injoignable : la page « Produit inconnu » a été capturée depuis l'état « Fiche non lue » (ambre, « Créer le produit à la main »).
 
-## État
-Non poussé (dépôt GitHub `sebagjeremy-stack/moutar` à créer par le médecin-utilisateur ; la session cloud ne peut pas le créer).
+## État (21/10/2026)
+Commité et poussé sur `main` ; non déployé.

@@ -12,7 +12,7 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/shared-types/package.json packages/shared-types/
 RUN pnpm install --frozen-lockfile --filter @moutar/api...
-# Les SOURCES seulement (jamais un node_modules ni un dist du poste : le dépôt n'a pas de .dockerignore à la racine).
+# Les SOURCES seulement (jamais un node_modules ni un dist du poste ; le .dockerignore de la racine les exclut aussi).
 COPY packages/shared-types/package.json packages/shared-types/tsconfig.json packages/shared-types/
 COPY packages/shared-types/src packages/shared-types/src
 COPY apps/api/package.json apps/api/tsconfig.json apps/api/nest-cli.json apps/api/

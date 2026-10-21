@@ -17,7 +17,7 @@ Monorepo pnpm : `apps/web` (React 18 + Vite + Tailwind, PWA, port 5273, proxy `/
 Maquettes HTML statiques dans `mockups/` AVANT tout écran (jetons dans `mockups/moutar.css`).
 
 ## Lots
-0. Cadrage + maquette (en cours) · 1. Code-barres → Open Food Facts → additifs · 2. Listes officielles · 3. Logo par photo · 4. Dictée et texte · 5. Contributions.
+0. Cadrage + maquette (fait) · 1. Code-barres → Open Food Facts → additifs · 2. Listes officielles · 3. Logo par photo · 4. Dictée et texte · 5. Contributions — les cinq lots sont codés, testés et commités (21/10/2026) ; mise en ligne à décider (`deploy/PAS-A-PAS.md`).
 Une fiche par sujet dans `docs/fonctionnalites/` ; la lire avant de toucher le sujet, la compléter à la fin du lot ; `docs/cadrage.md` fait foi sur le périmètre.
 
 ## Méthode (préférences du médecin-utilisateur)

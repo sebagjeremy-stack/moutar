@@ -1,5 +1,9 @@
 # Mise en ligne de Moutar — runbook
 
+> **Pas à pas pour le médecin-utilisateur** (commander le VPS, le DNS, SSH, Docker, `.env.prod`, le déploiement, le
+> compte admin, le téléphone, la sauvegarde, les pannes probables) : **`deploy/PAS-A-PAS.md`**. Cette page est le runbook
+> technique de référence.
+
 État au 21/10/2026 : **fichiers écrits et relus, jamais encore déployés** (Docker n'est pas disponible dans la session qui
 les a écrits : `docker compose config` a validé la composition, les images n'ont pas été construites). Ce qui reste à
 décider : le **nom de domaine** et le **VPS** (voir « À décider » en bas). Aucune donnée de santé ni d'identité dans

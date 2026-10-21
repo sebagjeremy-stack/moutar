@@ -1,6 +1,6 @@
 # Console d'administration (`/admin`)
 
-Socle posé au lot 1 (20/10/2026). Un seul compte, celui du médecin-utilisateur ; aucune donnée personnelle d'utilisateur n'y transite.
+Socle posé au lot 1 (20/10/2026). Un seul compte, celui du médecin-utilisateur ; aucune donnée personnelle d'utilisateur n'y transite. 21/10/2026 : `GET /admin/moi` répond **200** dans tous les cas (`{ connecte: false }` sans cookie ou sur une session morte, sinon `{ connecte: true, … }`) — la page `/admin` l'interroge avant de montrer la connexion, sans 401 ; la garde reste sur TOUTES les autres routes (`admin.guard.spec.ts` inchangé). Nouvel onglet « Journal produits » (`GET /admin/journal-produits?page=`, 50 par page) : `journal_produit`, en ajout seul (migration `0006`, déclencheurs, SELECT + INSERT seulement pour `moutar_app`).
 
 ## Décisions
 - **Connexion par e-mail + mot de passe** (`POST /api/v1/admin/connexion`) : hash **bcrypt coût 12** (`bcryptjs`, pur JavaScript, aucun binaire) ; réponse identique que le compte existe ou non (401 `identifiants_invalides`, comparaison contre un hash leurre) ; **10 essais par quart d'heure, par e-mail ET par adresse** (`common/auth/limite-de-debit.ts`, en mémoire : 429 `trop_de_demandes`).
@@ -23,3 +23,6 @@ Socle posé au lot 1 (20/10/2026). Un seul compte, celui du médecin-utilisateur
 - Changer son mot de passe depuis la console ; plusieurs comptes (modérateurs du lot 5).
 - ~~Pages de l'écran pour les contributions, les signalements, le journal IA et le tableau~~ faites le 20/10/2026 (`lot-5-contributions.md` § Écrans) ; l'onglet Certificateurs aussi.
 - Limite de débit en mémoire : suffisante pour une instance ; à revoir si plusieurs.
+
+## État (21/10/2026)
+Commité et poussé sur `main` ; non déployé.

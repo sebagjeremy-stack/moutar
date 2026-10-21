@@ -1,6 +1,6 @@
 # Lot 2 — Listes officielles (niveau 2) : import à la console, recherche par nom ou marque, carte
 
-Côté serveur, 20/10/2026 (`apps/api`, `packages/shared-types`), commité (`323bdce`) ; l'écran (`apps/web`) fait sur le contrat JSON du § « Contrat pour le web », commité (`d858705`). **Relecture critique du lot 2 appliquée le 20/10/2026** (§ « Corrections de la relecture critique », en fin de fiche) : dans l'arbre de travail, non commitée (le pilote relit et commite). Hébergement et migrations : `docs/deploiement.md` (§ « Hébergement et migrations »).
+Côté serveur, 20/10/2026 (`apps/api`, `packages/shared-types`), commité (`323bdce`) ; l'écran (`apps/web`) fait sur le contrat JSON du § « Contrat pour le web », commité (`d858705`). **Relecture critique du lot 2 appliquée le 20/10/2026** (§ « Corrections de la relecture critique », en fin de fiche), commitée. Hébergement et migrations : `docs/deploiement.md` (§ « Hébergement et migrations »).
 
 ## Décisions
 - **Schéma** (migration `0002_listes`) : `liste_officielle` (code `consistoire_paris` | `rav_wolff`, titre, `publie_le` et `valable_jusqu_au` en **colonnes `date`** — des JOURS `AAAA-MM-JJ`, aucun fuseau n'entre en jeu —, `importe_le`, `fichier_nom`, `note_source` (l'introduction de la source), `active`, `deleted_at`) ; **une seule liste active par code** (index unique partiel `liste_officielle_active_par_code_idx`). `ligne_liste` (rubrique, marque, produit_libelle, mention, `toute_marque`, `rubrique_reservee`, `ordre`, colonnes normalisées `rubrique_norm`, `marque_norm`, `produit_norm`, `deleted_at`). `produit` reçoit `nom_norm` et `marque_norm` (tenues à chaque écriture, `produits.service.ts : normes`). Index : `(liste_id, marque_norm)`, `(liste_id, ordre)`, trigram GIN (`pg_trgm`, extension de confiance : créée par la migration sans superutilisateur) sur les cinq colonnes normalisées.
@@ -105,16 +105,16 @@ Fait sur le contrat ci-dessus, sans toucher l'API ni le paquet partagé (les typ
 
 ## Ce qui reste
 - **Importer les vrais PDF depuis le Mac** (le conteneur n'atteint ni le Consistoire ni Chiourim) ; relire l'aperçu, **régler les heuristiques** sur la vraie structure (marques en majuscules, colonnes du PDF, en-têtes de page répétés, rubriques sur deux lignes) ; corriger les lignes à la console ; vérifier `note_source`.
-- Écran de la console (import, aperçu, correction des lignes), écran de recherche et carte (sous-lignes) : `apps/web`, en parallèle, sur ce contrat.
+- ~~Écran de la console (import, aperçu, correction des lignes), écran de recherche et carte (sous-lignes)~~ faits (`apps/web`, commités le 20/10/2026).
 - Synonymes de marques (« St Michel » / « Saint Michel »), rubriques sur deux niveaux, un produit cité sous plusieurs rubriques.
 - Le cache des listes actives (30 s) est par instance ; `LimiteDeDebit` en mémoire, par adresse (une seule instance).
 - Cadrage de l'hébergement (cadrage § 8.4, « décidé au lot 2 ») : les règles de migration et de rôles sont posées dans `docs/deploiement.md` ; le choix du fournisseur, les sauvegardes et le domaine restent à ouvrir avec le pilote.
 - La règle `rubriqueReservee` vit en deux exemplaires (serveur `analyse-liste-commun.ts`, écran `lignes-regles.ts`, même table de cas) : à déplacer dans `@moutar/shared-types/regles` au prochain lot qui touche le paquet partagé.
 
 ## Hébergement et migrations
-Voir **`docs/deploiement.md`** (court) : toute migration qui verrouille une table pose `SET LOCAL lock_timeout = '5s'` (10 s au plus) et `SET LOCAL statement_timeout` si elle réécrit la table ; `pg_trgm` est une extension de confiance qui demande le droit `CREATE` sur la base (à vérifier chez l'hébergeur) ; la session de migration est en `TimeZone = Europe/Paris` ; rôle applicatif non superutilisateur, sans `UPDATE` / `DELETE` / `TRUNCATE` sur les journaux — **reste bloquant avant la mise en ligne** (`console-admin.md`).
+Voir **`docs/deploiement.md`** (court) : toute migration qui verrouille une table pose `SET LOCAL lock_timeout = '5s'` (10 s au plus) et `SET LOCAL statement_timeout` si elle réécrit la table ; `pg_trgm` est une extension de confiance qui demande le droit `CREATE` sur la base (à vérifier chez l'hébergeur) ; la session de migration est en `TimeZone = Europe/Paris` ; rôle applicatif non superutilisateur, sans `UPDATE` / `DELETE` / `TRUNCATE` sur les journaux — reste bloquant levé le 21/10/2026 (`moutar_app`, `db:droits` ; `console-admin.md`).
 
-## Corrections de la relecture critique (20/10/2026, non commitées)
+## Corrections de la relecture critique (20/10/2026, commitées)
 Périmètre : `apps/api/src/modules/listes/**`, `apps/web/**`, cette fiche, `docs/deploiement.md`. Choix de cette passe :
 - **Écran, confiance faible → ambre** (`sous-lignes-regles.ts`) : « Cité dans une autre rubrique · à vérifier », la mention ne s'y ajoute pas (elle ne fonde rien) ; les deux formes du serveur (`cite` + `faible`, `non_verifie`) se lisent pareil.
 - **`rubriqueReservee` recalculé au serveur** (`reserveeEffective` : reçu OU rubrique) à l'import, à l'ajout, à la modification, avant `verifierLigne` ; à l'écran la case suit le texte de la rubrique (et reste cochable).
@@ -132,3 +132,6 @@ Périmètre : `apps/api/src/modules/listes/**`, `apps/web/**`, cette fiche, `doc
 4. « Non cité » en neutre, jamais rouge ; sans liste active, « Non vérifié » en ambre.
 5. Corps JSON à 1 Mo (au lieu de 100 Ko) ; recherche limitée à 120 par minute et par adresse.
 6. Les dates des listes en JOURS (`date`), saisies `AAAA-MM-JJ` (le Consistoire « juillet 2025 » → `2025-07-01`).
+
+## État (21/10/2026)
+Commité et poussé sur `main` ; non déployé.

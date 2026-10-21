@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { datesContribution, nomSource, pastilleContribution, sourceTronquee } from './niveau-3-regles';
+import { datesContribution, montrerEnAttente, nomSource, pastilleContribution, sourceTronquee } from './niveau-3-regles';
 
 describe('pastilleContribution (statut → ton + mot, jamais rouge)', () => {
   it.each([
@@ -41,5 +41,13 @@ describe('datesContribution', () => {
   });
   it('dit « Source non datée » et tait ce qui manque', () => {
     expect(datesContribution({ sourceDate: null, valideeLe: '2026-10-21T10:00:00.000Z', auteurNom: null, preuveUrl: null })).toBe('Source non datée · validée le 21/10/2026');
+  });
+});
+
+describe('montrerEnAttente : la phrase du repli ne double pas le détail de la ligne', () => {
+  it('rien en attente → non ; en attente et le détail le dit déjà → non ; en attente et le détail ne le dit pas → oui', () => {
+    expect(montrerEnAttente(0, 'Aucune contribution communautaire validée…')).toBe(false);
+    expect(montrerEnAttente(2, '2 contributions proposées, en attente de validation à la console : rien ne compte avant.')).toBe(false);
+    expect(montrerEnAttente(1, 'Les Bons Plans Cachères : « OK » Source datée du 3 mai 2026, validée le 21/10/2026.')).toBe(true);
   });
 });

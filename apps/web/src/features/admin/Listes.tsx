@@ -9,6 +9,7 @@ import { Pastille } from '../../components/Pastille';
 import { appel, envoyer } from '../../lib/api';
 import { formaterJour, formaterJourCivil, jourLocal } from '../../lib/dates';
 import { phraseErreur } from '../../lib/erreurs';
+import { pluriel } from '../../lib/texte';
 import { CODES_LISTES, LIBELLE_CODE } from '../../lib/listes';
 import { EtatNonLu, useLecture } from './lecture';
 import { incoherenceLigne, numerosIncoherents, rubriqueReservee } from './lignes-regles';
@@ -56,7 +57,7 @@ export function Listes({ surRefus }: { surRefus: Refus }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 id="titre-listes" className="text-17 font-semibold">
-            Listes officielles · {etat.data.compte} édition{etat.data.compte > 1 ? 's' : ''}
+            Listes officielles · {pluriel(etat.data.compte, 'édition', 'éditions')}
           </h1>
           <p className="muet">Une seule édition active par liste : importer une édition neuve désactive l’ancienne, qui reste lisible. Chaque import s’écrit au journal.</p>
         </div>
@@ -70,7 +71,7 @@ export function Listes({ surRefus }: { surRefus: Refus }) {
           surAnnule={() => setImportOuvert(false)}
           surImporte={(l) => {
             setImportOuvert(false);
-            setConfirmation(`Liste importée : « ${l.titre} », ${l.nombreLignes} ligne${l.nombreLignes > 1 ? 's' : ''}, active.`);
+            setConfirmation(`Liste importée : « ${l.titre} », ${pluriel(l.nombreLignes, 'ligne', 'lignes')}, active.`);
             void charger();
           }}
         />
@@ -94,7 +95,7 @@ export function Listes({ surRefus }: { surRefus: Refus }) {
                 <PastillesListe liste={l} />
               </div>
               <p className="muet mt-1">
-                {datesListe(l)} · {l.nombreLignes} ligne{l.nombreLignes > 1 ? 's' : ''} · importée le {formaterJour(l.importeLe)}
+                {datesListe(l)} · {pluriel(l.nombreLignes, 'ligne', 'lignes')} · importée le {formaterJour(l.importeLe)}
                 {l.fichierNom ? ` · ${l.fichierNom}` : ''}
               </p>
             </li>
@@ -224,7 +225,7 @@ function ImportListe({ surRefus, surImporte, surAnnule }: { surRefus: Refus; sur
       {apercu ? (
         <section aria-labelledby="titre-apercu" className="flex min-w-0 flex-col gap-3">
           <h2 id="titre-apercu" className="text-17 font-semibold">
-            Aperçu · {lignes.length} ligne{lignes.length > 1 ? 's' : ''} lue{lignes.length > 1 ? 's' : ''}
+            Aperçu · {pluriel(lignes.length, 'ligne lue', 'lignes lues')}
             {apercu.fichierNom ? <span className="muet"> · {apercu.fichierNom}</span> : null}
           </h2>
           {apercu.avertissements.length ? (
@@ -250,7 +251,7 @@ function ImportListe({ surRefus, surImporte, surAnnule }: { surRefus: Refus; sur
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Bouton variante="primaire" disabled={envoi !== 'aucun'} onClick={() => void importer()}>
-              {envoi === 'import' ? 'Import…' : `Importer ${lignes.length} ligne${lignes.length > 1 ? 's' : ''}`}
+              {envoi === 'import' ? 'Import…' : `Importer ${pluriel(lignes.length, 'ligne', 'lignes')}`}
             </Bouton>
             <Bouton onClick={surAnnule}>Annuler</Bouton>
           </div>
@@ -287,7 +288,7 @@ function TableLignes({ lignes, surChange }: { lignes: LigneAnalysee[]; surChange
     <div className="flex min-w-0 max-w-full flex-col gap-2">
       {incoherentes.length ? (
         <p className="text-warn font-semibold" role="status">
-          {incoherentes.length} ligne{incoherentes.length > 1 ? 's' : ''} incohérente{incoherentes.length > 1 ? 's' : ''} à corriger avant l’import (n° {incoherentes.slice(0, 10).join(', ')}
+          {pluriel(incoherentes.length, 'ligne incohérente', 'lignes incohérentes')} à corriger avant l’import (n° {incoherentes.slice(0, 10).join(', ')}
           {incoherentes.length > 10 ? '…' : ''}).
         </p>
       ) : null}
@@ -524,7 +525,7 @@ function EnTeteListe({ liste, surModifie, surRefus }: { liste: ListeOfficielle; 
         <PastillesListe liste={liste} />
       </div>
       <p className="muet">
-        {LIBELLE_CODE[liste.code]} · {datesListe(liste)} · {liste.nombreLignes} ligne{liste.nombreLignes > 1 ? 's' : ''} · importée le {formaterJour(liste.importeLe)}
+        {LIBELLE_CODE[liste.code]} · {datesListe(liste)} · {pluriel(liste.nombreLignes, 'ligne', 'lignes')} · importée le {formaterJour(liste.importeLe)}
         {liste.fichierNom ? ` · ${liste.fichierNom}` : ''}
       </p>
       {liste.noteSource && !edition ? <p className="whitespace-pre-line text-note">{liste.noteSource}</p> : null}

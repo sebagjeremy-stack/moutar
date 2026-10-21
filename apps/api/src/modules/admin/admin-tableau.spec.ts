@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { Database } from '../../database/client';
 import { baseSimulee, nomTable, type Chaine } from '../../test/db-simulee';
-import { AdminService, LIGNES_JOURNAL_IA } from './admin.service';
+import { AdminService, LIGNES_JOURNAL_IA, LIGNES_JOURNAL_PRODUIT } from './admin.service';
 
-const COMPTES: Record<string, number> = { produit: 12, contribution: 3, signalement: 2, journal_ia: 7 };
+const COMPTES: Record<string, number> = { produit: 12, contribution: 3, signalement: 2, journal_ia: 7, journal_produit: 4 };
 
 function reponse(chaine: Chaine): unknown {
   const table = nomTable(chaine);
-  if (chaine.some((c) => c.methode === 'offset')) return [{ id: 'j1', fournisseur: 'ovh', modele: 'whisper', usage: 'transcription', dureeMs: 500, jetonsEntree: null, jetonsSortie: null, ok: true, erreur: null, createdAt: new Date('2026-10-20T10:00:00Z') }];
+  if (chaine.some((c) => c.methode === 'offset')) {
+    if (table === 'journal_produit') {
+      return [
+        { id: 'k1', produitId: 'p1', action: 'ingredients.ecriture', source: 'ocr', longueur: 61, empreinte: 'a'.repeat(64), createdAt: new Date('2026-10-21T08:00:00Z'), nom: 'Petit Beurre', ean: '3000000000901' },
+        { id: 'k2', produitId: 'p2', action: 'produit.creation', source: 'manuel', longueur: 0, empreinte: 'b'.repeat(64), createdAt: new Date('2026-10-21T07:00:00Z'), nom: null, ean: null },
+      ];
+    }
+    return [{ id: 'j1', fournisseur: 'ovh', modele: 'whisper', usage: 'transcription', dureeMs: 500, jetonsEntree: null, jetonsSortie: null, ok: true, erreur: null, createdAt: new Date('2026-10-20T10:00:00Z') }];
+  }
   return [{ n: COMPTES[table] ?? 0 }];
 }
 
@@ -44,5 +52,22 @@ describe('AdminService.journalIa (lecture seule, 50 par page)', () => {
     expect(lecture.find((a) => a.methode === 'limit')!.args).toEqual([50]);
     expect(lecture.find((a) => a.methode === 'offset')!.args).toEqual([100]);
     expect(LIGNES_JOURNAL_IA).toBe(50);
+  });
+});
+
+describe('AdminService.journalProduits (lecture seule, 50 par page, jamais le texte)', () => {
+  it('page 2 → décalage 50, total compté, le produit nommé (ou null si la jointure ne rend rien), aucun texte', async () => {
+    const { faux, db } = baseSimulee(reponse);
+    const page = await new AdminService(faux as unknown as Database).journalProduits(2);
+    expect(page).toMatchObject({ page: 2, parPage: LIGNES_JOURNAL_PRODUIT, total: 4 });
+    expect(page.lignes).toEqual([
+      { id: 'k1', produitId: 'p1', action: 'ingredients.ecriture', source: 'ocr', longueur: 61, empreinte: 'a'.repeat(64), createdAt: '2026-10-21T08:00:00.000Z', produit: { nom: 'Petit Beurre', ean: '3000000000901' } },
+      { id: 'k2', produitId: 'p2', action: 'produit.creation', source: 'manuel', longueur: 0, empreinte: 'b'.repeat(64), createdAt: '2026-10-21T07:00:00.000Z', produit: null },
+    ]);
+    expect(Object.keys(page.lignes[0]!)).not.toContain('ingredientsTexte');
+    const lecture = db.find((c) => nomTable(c) === 'journal_produit' && c.some((a) => a.methode === 'offset'))!;
+    expect(lecture.find((a) => a.methode === 'limit')!.args).toEqual([50]);
+    expect(lecture.find((a) => a.methode === 'offset')!.args).toEqual([50]);
+    expect(lecture.some((a) => a.methode === 'leftJoin')).toBe(true);
   });
 });

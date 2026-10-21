@@ -8,28 +8,8 @@ export const SOURCE_TEXTE_MAX = 1000;
 export const AUTEUR_NOM_MAX = 40;
 export const SIGNALEMENT_TEXTE_MAX = 500;
 
-/**
- * Pure : un lien de preuve est admis s'il est en https et si son hôte EST un hôte admis ou un sous-domaine de l'un
- * (`m.facebook.com`, `www.lesbonsplanscachers.fr`). Un hôte hors liste, un `http:`, un `javascript:` ou un texte qui n'est
- * pas une adresse sont refusés. L'adresse est rendue normalisée (sans identifiants `user:pass@`, sans fragment, sans les
- * paramètres de pistage `fbclid` et `utm_*` : une preuve est un lien, pas un traceur).
- */
-const PARAMETRE_DE_PISTAGE = /^(fbclid|utm_[a-z0-9_]*)$/i;
-
-export function preuveUrlAdmise(brut: string, hotes: readonly string[]): string | null {
-  let url: URL;
-  try {
-    url = new URL(brut.trim());
-  } catch {
-    return null;
-  }
-  if (url.protocol !== 'https:' || url.username || url.password) return null;
-  const hote = url.hostname.toLowerCase();
-  if (!hotes.some((h) => hote === h || hote.endsWith(`.${h}`))) return null;
-  url.hash = '';
-  for (const cle of [...url.searchParams.keys()]) if (PARAMETRE_DE_PISTAGE.test(cle)) url.searchParams.delete(cle);
-  return url.toString();
-}
+// La règle du lien de preuve (`preuveUrlAdmise`) vit UNE fois dans `@moutar/shared-types/regles/preuve` : le serveur
+// (`contributions.controller.ts : verifierPreuve`) et l'écran la lisent tous deux (21/10/2026).
 
 /** Pure : les textes d'une proposition en texte brut, tronqués à leurs bornes ; le pseudonyme vide devient null. */
 export function nettoyerProposition(p: PropositionContribution): PropositionContribution {

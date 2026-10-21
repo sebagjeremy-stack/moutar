@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { z } from 'zod';
 import type { Produit } from '@moutar/shared-types';
+import { LimiteProduits } from './limite-produits';
 import { ProduitsService } from './produits.service';
 
 /** Un EAN : 8 à 14 chiffres (EAN-8, EAN-13, GTIN-14). */
@@ -21,22 +23,32 @@ const schemaIngredients = z.object({ ingredientsTexte: z.string().trim().min(1).
 
 @Controller('produits')
 export class ProduitsController {
-  constructor(private readonly produits: ProduitsService) {}
+  constructor(
+    private readonly produits: ProduitsService,
+    private readonly limite: LimiteProduits,
+  ) {}
 
+  /** La fiche en cache n'est pas limitée ; seul l'appel à Open Food Facts pour un EAN inconnu l'est (60 / 10 min par adresse). */
   @Get(':ean')
-  lire(@Param('ean') ean: string): Promise<Produit> {
-    return this.produits.lireParEan(schemaEan.parse(ean));
+  lire(@Param('ean') ean: string, @Req() req: Request): Promise<Produit> {
+    const adresse = req.ip ?? 'inconnue';
+    return this.produits.lireParEan(schemaEan.parse(ean), { avantAppelOff: () => this.limite.exigerLectureOff(adresse) });
   }
 
+  /** 30 créations par heure et par adresse ; une requête refusée par zod ne compte pas. */
   @Post()
-  creer(@Body() corps: unknown): Promise<Produit> {
+  creer(@Body() corps: unknown, @Req() req: Request): Promise<Produit> {
     const c = schemaCreation.parse(corps);
+    this.limite.exigerCreation(req.ip ?? 'inconnue');
     return this.produits.creerManuel({ ean: c.ean ?? null, nom: c.nom, marque: c.marque ?? null, ingredientsTexte: c.ingredientsTexte ?? null });
   }
 
+  /** 30 réécritures par heure et par adresse ; chacune laisse une ligne dans `journal_produit` (empreinte, jamais le texte). */
   @Put(':ean/ingredients')
-  ingredients(@Param('ean') ean: string, @Body() corps: unknown): Promise<Produit> {
+  ingredients(@Param('ean') ean: string, @Body() corps: unknown, @Req() req: Request): Promise<Produit> {
     const c = schemaIngredients.parse(corps);
-    return this.produits.mettreAJourIngredients(schemaEan.parse(ean), c.ingredientsTexte, c.source);
+    const e = schemaEan.parse(ean);
+    this.limite.exigerIngredients(req.ip ?? 'inconnue');
+    return this.produits.mettreAJourIngredients(e, c.ingredientsTexte, c.source);
   }
 }

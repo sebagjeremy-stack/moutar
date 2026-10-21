@@ -40,7 +40,10 @@ test.describe('③ ingrédients', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Photographier l’étiquette' })).toBeVisible();
     // Sans caméra (Chromium headless) : l'image vient de l'appareil — un PNG de synthèse, jamais une photo réelle.
     await page.locator('input[type="file"]').setInputFiles(imagePng());
-    await expect(page.getByText(/envoyée seulement si vous lisez, jamais gardée/)).toBeVisible();
+    // L'aperçu de l'image (décodage, recompression sur canvas) peut prendre quelques secondes en headless : on sonde la
+    // figure (l'image décrite, sa légende) jusqu'à 20 s avant d'aller plus loin — jamais une attente fixe.
+    await expect.poll(async () => page.locator('figure img[alt="La photo prise de l’étiquette"]').count(), { timeout: 20_000, message: 'l’aperçu de la photo n’est pas apparu' }).toBe(1);
+    await expect(page.locator('figcaption')).toContainText('envoyée seulement si vous lisez, jamais gardée', { timeout: 20_000 });
     await page.getByRole('button', { name: 'Lire les ingrédients' }).click();
     await expect(page).toHaveURL(new RegExp(`/produit/${eans.ocr}/ingredients$`));
     expect(appelsOcr).toBe(1);

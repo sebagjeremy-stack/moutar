@@ -16,9 +16,10 @@ import { phraseErreur } from '../../lib/erreurs';
 import { formaterEan, formaterJour } from '../../lib/dates';
 import { noterDansHistorique } from '../../lib/historique';
 import { lireSeuilLocal } from '../../lib/stockage-local';
+import { accord, pluriel } from '../../lib/texte';
 import { IngredientsEnGras } from './IngredientsEnGras';
 import { Partager } from './Partager';
-import { datesContribution, pastilleContribution, sourceTronquee } from './niveau-3-regles';
+import { datesContribution, montrerEnAttente, pastilleContribution, sourceTronquee } from './niveau-3-regles';
 import { datesSousLigne, pastilleSousLigne, precisionSousLigne, SANS_LISTE } from './sous-lignes-regles';
 import { SIGNALEMENT_TEXTE_MAX } from '../contribution/contribution-regles';
 
@@ -216,7 +217,7 @@ function LigneNiveau({ ligne, ean, tagsIgnores, surRelire }: { ligne: LigneCarte
       ) : null}
       {tagsIgnores > 0 ? (
         <p className="muet ml-[42px] mt-[6px]">
-          {tagsIgnores} additif{tagsIgnores > 1 ? 's' : ''} non lu{tagsIgnores > 1 ? 's' : ''} (tags Open Food Facts que le code ne sait pas lire).
+          {pluriel(tagsIgnores, 'additif', 'additifs')} non {accord(tagsIgnores, 'lu', 'lus')} (tags Open Food Facts que le code ne sait pas lire).
         </p>
       ) : null}
     </li>
@@ -270,22 +271,19 @@ function ActionsNiveau3({ ligne, ean }: { ligne: LigneCarte; ean: string }) {
             </Bouton>
           </Bandeau>
         ) : (
-          <ContributionsValidees data={validees.data} />
+          <ContributionsValidees data={validees.data} detailLigne={ligne.detail} />
         )}
       </details>
     </div>
   );
 }
 
-function ContributionsValidees({ data }: { data: ContributionsProduit }) {
+function ContributionsValidees({ data, detailLigne }: { data: ContributionsProduit; detailLigne: string }) {
   return (
     <>
       {data.contributions.length === 0 ? <p className="muet mt-1">Aucune contribution validée pour l’instant.</p> : null}
-      {data.enAttente > 0 ? (
-        <p className="muet mt-1">
-          {data.enAttente} contribution{data.enAttente > 1 ? 's' : ''} en attente de validation à la console (rien ne compte avant).
-        </p>
-      ) : null}
+      {/* La phrase « en attente » ne s'écrit pas quand le détail de la ligne (le serveur) la porte déjà : une fois par vue. */}
+      {montrerEnAttente(data.enAttente, detailLigne) ? <p className="muet mt-1">{pluriel(data.enAttente, 'contribution', 'contributions')} en attente de validation à la console (rien ne compte avant).</p> : null}
       {data.contributions.length > 0 ? (
         <ul className="liste mt-1" role="list" aria-label="Contributions validées">
           {data.contributions.map((c) => {
@@ -354,7 +352,7 @@ function PanneauSignalement({ ean, surFermer }: { ean: string; surFermer: () => 
           Merci, c’est noté. L’équipe relira la fiche à la console.
         </p>
       ) : (
-        <form className="mt-2 flex flex-col gap-3" onSubmit={envoyerSignalement}>
+        <form className="mt-2 flex flex-col gap-3" noValidate onSubmit={envoyerSignalement}>
           <fieldset className="m-0 border-0 p-0">
             <legend className="mb-1 font-semibold">Niveau concerné</legend>
             <ul className="flex flex-col" role="list">
@@ -519,7 +517,7 @@ function ProduitInconnu({ ean, barre, surCree }: { ean: string; barre: React.Rea
       </h1>
       <p className="muet">EAN {formaterEan(ean)}</p>
       <Bandeau ton="warn">Open Food Facts ne connaît pas encore ce code-barres. Créez la fiche à la main : l’EAN sera gardé pour la prochaine fois.</Bandeau>
-      <form className="flex flex-col gap-3" onSubmit={creer}>
+      <form className="flex flex-col gap-3" noValidate onSubmit={creer}>
         <Champ id="nom" etiquette="Nom du produit" value={nom} onChange={(e) => setNom(e.target.value)} required maxLength={200} autoFocus />
         <Champ id="marque" etiquette="Marque (facultatif)" value={marque} onChange={(e) => setMarque(e.target.value)} maxLength={200} />
         <ZoneTexte id="ingredients" etiquette="Ingrédients (facultatif)" aide="Recopiez la liste de l’étiquette, telle quelle. L’analyse des additifs se fait sur ce texte." value={ingredients} onChange={(e) => setIngredients(e.target.value)} maxLength={5000} />

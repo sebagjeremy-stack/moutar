@@ -1,30 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ContributionPublique } from '@moutar/shared-types';
 import { ErreurMetier } from '../../common/erreurs/erreur-metier';
-import { contributionFondatrice, nettoyerProposition, preuveUrlAdmise, verdictDeContribution } from './contributions-regles';
+import { contributionFondatrice, nettoyerProposition, verdictDeContribution } from './contributions-regles';
 import { schemaProposition, schemaSignalement, verifierPreuve, verifierPseudonyme, verifierSourceDate } from './contributions.controller';
 
 const HOTES = ['facebook.com', 'lesbonsplanscachers.fr'];
 
-describe('preuveUrlAdmise (https, hôtes admis et leurs sous-domaines)', () => {
-  it('admet facebook.com, m.facebook.com, www.lesbonsplanscachers.fr ; retire le fragment', () => {
-    expect(preuveUrlAdmise('https://www.facebook.com/groups/lbpc/posts/1', HOTES)).toBe('https://www.facebook.com/groups/lbpc/posts/1');
-    expect(preuveUrlAdmise(' https://m.facebook.com/x#frag ', HOTES)).toBe('https://m.facebook.com/x');
-    expect(preuveUrlAdmise('https://lesbonsplanscachers.fr/produit/42?x=1', HOTES)).toBe('https://lesbonsplanscachers.fr/produit/42?x=1');
-  });
-  it('retire fbclid et utm_* de la preuve, garde les autres paramètres', () => {
-    expect(preuveUrlAdmise('https://www.facebook.com/groups/lbpc/posts/1?fbclid=IwAR0abc&utm_source=fb&utm_medium=social&comment_id=7', HOTES)).toBe('https://www.facebook.com/groups/lbpc/posts/1?comment_id=7');
-    expect(preuveUrlAdmise('https://lesbonsplanscachers.fr/p?UTM_CAMPAIGN=x', HOTES)).toBe('https://lesbonsplanscachers.fr/p');
-  });
-  it('refuse http, un hôte hors liste, un hôte qui finit pareil sans être un sous-domaine, javascript:, des identifiants, un texte', () => {
-    expect(preuveUrlAdmise('http://www.facebook.com/x', HOTES)).toBeNull();
-    expect(preuveUrlAdmise('https://example.org/facebook.com', HOTES)).toBeNull();
-    expect(preuveUrlAdmise('https://notfacebook.com/x', HOTES)).toBeNull();
-    expect(preuveUrlAdmise('https://facebook.com.evil.net/x', HOTES)).toBeNull();
-    expect(preuveUrlAdmise('javascript:alert(1)', HOTES)).toBeNull();
-    expect(preuveUrlAdmise('https://user:pass@facebook.com/x', HOTES)).toBeNull();
-    expect(preuveUrlAdmise('voir le groupe', HOTES)).toBeNull();
-  });
+// Les cas de `preuveUrlAdmise` sont dans `packages/shared-types/src/regles/preuve.spec.ts` (règle partagée, 21/10/2026).
+describe('verifierPreuve (le serveur tranche sur la règle partagée)', () => {
   it('verifierPreuve : null reste null ; un lien refusé → 400 preuve_refusee qui nomme les hôtes admis', () => {
     expect(verifierPreuve(null, HOTES)).toBeNull();
     expect(verifierPreuve('https://facebook.com/x', HOTES)).toBe('https://facebook.com/x');

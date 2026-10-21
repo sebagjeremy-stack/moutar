@@ -9,7 +9,7 @@ import type { Pool } from 'pg';
  *
  * - le propriétaire (`moutar`) ne sert qu'aux MIGRATIONS, aux graines et à ce script (`DATABASE_URL_MIGRATIONS`) ;
  * - l'API se connecte avec `moutar_app` (`DATABASE_URL`), qui lit et écrit les tables, mais ne peut sur un JOURNAL
- *   (`journal_admin`, `journal_ia`, tout `journal_*` futur) qu'ajouter et lire — jamais modifier, effacer ni vider —,
+ *   (`journal_admin`, `journal_ia`, `journal_produit`, tout `journal_*` futur) qu'ajouter et lire — jamais modifier, effacer ni vider —,
  *   ne crée rien dans le schéma, et ne voit pas la table des migrations.
  *
  * Le rôle et ses droits se posent par `pnpm --filter @moutar/api db:droits` (`droits.ts`), après les migrations, de façon
@@ -38,6 +38,7 @@ export interface DroitsJournal {
 export const JOURNAUX: readonly DroitsJournal[] = [
   { table: 'journal_admin', colonnesModifiables: [] },
   { table: 'journal_ia', colonnesModifiables: [] },
+  { table: 'journal_produit', colonnesModifiables: [] },
 ];
 
 /** Un identifiant PostgreSQL sûr : le nom d'un rôle ou d'une table ne vient jamais d'un utilisateur, on le vérifie quand même. */

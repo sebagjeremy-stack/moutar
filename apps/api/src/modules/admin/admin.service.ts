@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, count, desc, eq, gt, gte, isNull } from 'drizzle-orm';
-import type { Additif, Certificateur, PageJournalIa, StatutAdditif, TableauConsole } from '@moutar/shared-types';
+import type { Additif, Certificateur, PageJournalIa, PageJournalProduit, StatutAdditif, TableauConsole } from '@moutar/shared-types';
 import { ADDITIFS } from '@moutar/shared-types/catalogues/additifs';
 import { CERTIFICATEURS } from '@moutar/shared-types/catalogues/certificateurs';
 import { ErreurMetier } from '../../common/erreurs/erreur-metier';
@@ -8,7 +8,7 @@ import { LimiteDeDebit } from '../../common/auth/limite-de-debit';
 import type { Database } from '../../database/client';
 import { DRIZZLE } from '../../database/database.module';
 import { debutDuJour, jourLocal } from '../../common/temps/jour-local';
-import { additifSurcharge, certificateurSurcharge, compteAdmin, contribution, journalAdmin, journalIa, produit, sessionAdmin, signalement } from '../../database/schema';
+import { additifSurcharge, certificateurSurcharge, compteAdmin, contribution, journalAdmin, journalIa, journalProduit, produit, sessionAdmin, signalement } from '../../database/schema';
 import { HASH_LEURRE, verifierMotDePasse } from './mot-de-passe';
 import { DUREE_SESSION_MS, genererJeton, hacherJeton } from './session-admin';
 
@@ -34,8 +34,9 @@ export interface CertificateurConsole extends Certificateur {
 }
 
 const FENETRE_MS = 15 * 60 * 1000;
-/** Lot 5 : la pagination du journal du moteur d'IA à la console. */
+/** Lot 5 : la pagination du journal du moteur d'IA à la console ; même pas pour le journal des produits (21/10/2026). */
 export const LIGNES_JOURNAL_IA = 50;
+export const LIGNES_JOURNAL_PRODUIT = 50;
 const ESSAIS = 10;
 
 /** Pure : un e-mail tronqué pour le journal (« adm…@exemple.fr ») — jamais l'adresse entière d'un essai refusé. */
@@ -179,6 +180,28 @@ export class AdminService {
       .limit(parPage)
       .offset((p - 1) * parPage);
     return { lignes: lignes.map((l) => ({ ...l, createdAt: l.createdAt.toISOString() })), page: p, parPage, total: Number(total?.n ?? 0) };
+  }
+
+  /**
+   * 21/10/2026 : le journal des écritures publiques sur les fiches (`journal_produit`), lecture seule, 50 lignes par page
+   * (page 1 = les plus récentes), le produit nommé (nom, EAN ; une fiche retirée reste nommée) — jamais le texte écrit.
+   */
+  async journalProduits(page = 1, parPage = LIGNES_JOURNAL_PRODUIT): Promise<PageJournalProduit> {
+    const p = Math.max(1, Math.floor(page));
+    const [total] = await this.db.select({ n: count() }).from(journalProduit);
+    const lignes = await this.db
+      .select({ id: journalProduit.id, produitId: journalProduit.produitId, action: journalProduit.action, source: journalProduit.source, longueur: journalProduit.longueur, empreinte: journalProduit.empreinte, createdAt: journalProduit.createdAt, nom: produit.nom, ean: produit.ean })
+      .from(journalProduit)
+      .leftJoin(produit, eq(produit.id, journalProduit.produitId))
+      .orderBy(desc(journalProduit.createdAt))
+      .limit(parPage)
+      .offset((p - 1) * parPage);
+    return {
+      lignes: lignes.map(({ nom, ean, ...l }) => ({ ...l, produit: nom === null ? null : { nom, ean }, createdAt: l.createdAt.toISOString() })),
+      page: p,
+      parPage,
+      total: Number(total?.n ?? 0),
+    };
   }
 
   /** Lot 5 : le tableau de bord — des COMPTES, jamais une personne ; « du jour » = le jour de la pendule du centre. */

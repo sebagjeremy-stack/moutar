@@ -34,3 +34,12 @@ export function datesContribution(c: Pick<ContributionPublique, 'sourceDate' | '
   if (c.preuveUrl) parts.push('preuve jointe');
   return parts.join(' · ');
 }
+
+/**
+ * Pure : la phrase « n contribution(s) en attente… » du repli ne s'écrit que si le DÉTAIL de la ligne (le serveur) ne la
+ * porte pas déjà (« Contribution en attente de validation » : son détail compte les propositions) — une information n'est
+ * écrite qu'une fois par vue.
+ */
+export function montrerEnAttente(enAttente: number, detailLigne: string): boolean {
+  return enAttente > 0 && !/en attente/i.test(detailLigne);
+}

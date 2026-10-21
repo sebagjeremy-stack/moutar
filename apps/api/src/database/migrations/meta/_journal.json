@@ -43,6 +43,13 @@
       "when": 1792539437991,
       "tag": "0005_certification_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792543596020,
+      "tag": "0006_journal_produit",
+      "breakpoints": true
     }
   ]
 }

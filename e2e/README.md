@@ -62,3 +62,9 @@ ce qu'elle crée** (retrait doux : `deleted_at`, par l'écran, l'API ou SQL).
   chargent un PNG (une image de synthèse de `.devstack` si elle existe, sinon un PNG généré par `imagePng()` — jamais une
   photo réelle) dans l'entrée de fichier masquée (`setInputFiles`).
 - `page.route('**/api/v1/produits/**')` : le glob `*` ne traverse pas un `/` — la carte est `…/produits/<ean>/carte`.
+- **L'aperçu d'une photo** (`/scan`, après `setInputFiles`) se décode et se recompresse sur un canvas : en headless, cela
+  peut prendre quelques secondes. `ingredients.spec` sonde la figure (`img[alt]`, `figcaption`) par `expect.poll` jusqu'à
+  20 s — jamais une attente fixe, jamais un `toBeVisible` au délai par défaut.
+- **La région `role="status"` VIDE de `TexteCopiable`** (console : lien de preuve copiable) est voulue : elle existe avant
+  le clic pour que « Copié. » soit annoncé aux lecteurs d'écran au moment où il s'écrit (une région vive créée après coup
+  n'est pas toujours lue). `accessibilite.spec` ne doit pas la compter comme un défaut.

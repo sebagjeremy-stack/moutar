@@ -1,8 +1,9 @@
 import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import type { EtatSessionConsole } from '@moutar/shared-types';
 import { statutAdditifEnum } from '../../database/schema';
-import { optionsCookie } from '../../common/auth/cookies';
+import { lireCookie, optionsCookie } from '../../common/auth/cookies';
 import { loadEnv } from '../../config/env';
 import { ProduitsService } from '../produits/produits.service';
 import { AdminGuard, type RequeteAdmin } from './admin.guard';
@@ -23,10 +24,21 @@ const schemaSurchargeCertificateur = z.object({
 const schemaCodeCertificateur = z.string().regex(/^[a-z_]{2,50}$/, 'code de certificateur attendu');
 const schemaPage = z.coerce.number().int().min(1).max(100_000).default(1);
 
-/** La connexion, seule route de la console sans garde. */
+/**
+ * Les deux routes de la console SANS garde : la connexion, et `GET /admin/moi` qui dit si une session est ouverte
+ * (200 `{ connecte: false }` sans cookie ou sur une session morte — jamais un 401 : la page `/admin` l'interroge avant de
+ * montrer la connexion). Tout le reste reste derrière `AdminGuard`.
+ */
 @Controller('admin')
 export class AdminConnexionController {
   constructor(private readonly admin: AdminService) {}
+
+  @Get('moi')
+  async moi(@Req() req: Request): Promise<EtatSessionConsole> {
+    const jeton = lireCookie(req.headers.cookie, COOKIE_ADMIN);
+    const session = jeton ? await this.admin.sessionDepuisJeton(jeton) : null;
+    return session ? { connecte: true, ...session } : { connecte: false };
+  }
 
   @Post('connexion')
   async connexion(@Body() corps: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<SessionLue> {
@@ -52,11 +64,6 @@ export class AdminController {
     await this.admin.deconnexion(req.admin!);
     res.clearCookie(COOKIE_ADMIN, { path: '/' });
     return { ok: true };
-  }
-
-  @Get('moi')
-  moi(@Req() req: RequeteAdmin): SessionLue {
-    return req.admin!;
   }
 
   @Get('additifs')
@@ -104,6 +111,12 @@ export class AdminController {
   @Get('journal-ia')
   journalIa(@Query('page') page?: string) {
     return this.admin.journalIa(schemaPage.parse(page));
+  }
+
+  /** 21/10/2026 : le journal des écritures publiques sur les fiches, lecture seule, 50 par page (`?page=`), sans le texte. */
+  @Get('journal-produits')
+  journalProduits(@Query('page') page?: string) {
+    return this.admin.journalProduits(schemaPage.parse(page));
   }
 
   /** Lot 5 : le tableau de bord — des comptes, jamais une personne. */

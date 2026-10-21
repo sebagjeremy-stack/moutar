@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { corpsProposition, dateAdmise, erreursProposition, jourReel, preuveAdmise, pseudonymeAdmis, texteSourceAdmis } from './contribution-regles';
+import { corpsProposition, dateAdmise, erreursProposition, jourReel, preuveAdmise, preuveGardee, pseudonymeAdmis, texteSourceAdmis } from './contribution-regles';
 
 const AUJOURDHUI = '2026-10-20';
 
@@ -74,5 +74,14 @@ describe('erreursProposition', () => {
 describe('corpsProposition', () => {
   it('ébarbe les textes et rend null les facultatifs vides', () => {
     expect(corpsProposition({ statutPropose: 'cite', sourceType: 'lbpc', sourceTexte: ' OK ', sourceDate: ' ', preuveUrl: '', auteurNom: ' Sarah ' })).toEqual({ statutPropose: 'cite', sourceType: 'lbpc', sourceTexte: 'OK', sourceDate: null, preuveUrl: null, auteurNom: 'Sarah' });
+  });
+});
+
+describe('preuveGardee : le lien tel que le serveur le gardera (règle partagée), et s’il diffère', () => {
+  it('retire fbclid et utm_*, dit que le lien a changé ; un lien propre reste tel quel ; vide → null ; refusé → tel quel', () => {
+    expect(preuveGardee('https://www.facebook.com/groups/lbpc/posts/1?fbclid=IwAR0abc&utm_source=fb&comment_id=7')).toEqual({ lien: 'https://www.facebook.com/groups/lbpc/posts/1?comment_id=7', modifie: true });
+    expect(preuveGardee(' https://m.facebook.com/x ')).toEqual({ lien: 'https://m.facebook.com/x', modifie: false });
+    expect(preuveGardee('')).toBeNull();
+    expect(preuveGardee('https://example.org/x')).toEqual({ lien: 'https://example.org/x', modifie: false });
   });
 });

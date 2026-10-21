@@ -8,6 +8,7 @@ import { Pastille } from '../../components/Pastille';
 import { envoyer } from '../../lib/api';
 import { formaterEan, formaterJour } from '../../lib/dates';
 import { phraseErreur } from '../../lib/erreurs';
+import { pluriel } from '../../lib/texte';
 import { EtatNonLu, useLecture } from './lecture';
 import { Filtre, type Refus } from './outils';
 
@@ -44,7 +45,7 @@ export function Signalements({ surRefus }: { surRefus: Refus }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 id="titre-signalements" className="text-17 font-semibold">
-            Signalements · {etat.data.length} {etatFiltre === 'ouvert' ? 'ouverts' : 'traités'}
+            Signalements · {etatFiltre === 'ouvert' ? pluriel(etat.data.length, 'ouvert', 'ouverts') : pluriel(etat.data.length, 'traité', 'traités')}
           </h1>
           <p className="muet">Ce que le public signale sur une ligne de la fiche. Marquer traité ne change rien à la fiche : corrigez-la d’abord (contribution, liste, additif), puis fermez le signalement.</p>
         </div>
@@ -102,8 +103,9 @@ function LigneSignalement({ s, surRefus, surTraite, surDejaTraite }: { s: Signal
 
   return (
     <li className="flex flex-col gap-2 py-3">
+      {/* Au téléphone, le nom du produit prend toute la largeur ; les pastilles passent sur leur ligne. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 grow basis-full sm:basis-0">
           {s.produit.ean ? (
             <Link to={`/produit/${s.produit.ean}`} className="font-semibold text-text">
               {s.produit.nom}

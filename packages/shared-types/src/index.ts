@@ -333,6 +333,36 @@ export interface PageJournalIa {
   total: number;
 }
 
+/**
+ * Une ligne de `journal_produit` lue à la console (21/10/2026) : une écriture PUBLIQUE sur une fiche (création manuelle,
+ * réécriture des ingrédients) — la source déclarée, la longueur et l'empreinte SHA-256 du texte, JAMAIS le texte ; le
+ * produit est nommé (nom, EAN) pour s'y retrouver. Aucune donnée personnelle (il n'y en a pas).
+ */
+export interface LigneJournalProduit {
+  id: string;
+  produitId: string;
+  produit: { nom: string; ean: string | null } | null;
+  action: 'ingredients.ecriture' | 'produit.creation';
+  source: string;
+  longueur: number;
+  empreinte: string;
+  createdAt: string;
+}
+
+export interface PageJournalProduit {
+  lignes: LigneJournalProduit[];
+  /** À partir de 1. */
+  page: number;
+  parPage: number;
+  total: number;
+}
+
+/**
+ * `GET /admin/moi` (21/10/2026) : 200 dans tous les cas — `{ connecte: false }` sans cookie ou sur une session morte (la
+ * page `/admin` sait alors montrer la connexion sans un 401 dans la console du navigateur), sinon la session.
+ */
+export type EtatSessionConsole = { connecte: false } | { connecte: true; sessionId: string; compteId: string; email: string; nom: string };
+
 /* ---------- Lot 2 : listes officielles ---------- */
 
 /** Les listes importées : Consistoire de Paris (« Produits 2025-2026 »), Rav Wolff (liste 2026, Chiourim). */

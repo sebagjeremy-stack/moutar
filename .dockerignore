@@ -1,0 +1,18 @@
+# Ce que le contexte de build Docker (racine du dépôt : deploy/api.Dockerfile, deploy/web.Dockerfile) ne reçoit JAMAIS.
+# Les Dockerfiles ne copient que les sources (package.json, src, public, tsconfig, nest-cli, vite/postcss/tailwind,
+# deploy/Caddyfile) : rien d'exclu ici n'est attendu par un COPY.
+node_modules
+**/node_modules
+.devstack
+.env
+.env.*
+!.env.example
+dist
+**/dist
+.git
+e2e
+mockups
+.claude
+docs
+*.log
+.DS_Store

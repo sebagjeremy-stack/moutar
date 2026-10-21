@@ -6,6 +6,7 @@ import { Carte } from '../../components/Carte';
 import { Pastille } from '../../components/Pastille';
 import { formaterEan, formaterJourCivil } from '../../lib/dates';
 import { LIBELLE_CODE } from '../../lib/listes';
+import { pluriel } from '../../lib/texte';
 import type { EtatRecherche } from './useRecherche';
 
 /** Une suggestion : un produit connu (→ sa fiche) ou une ligne d'une liste (→ un panneau en place). */
@@ -91,7 +92,7 @@ export function Suggestions({ etat, options, actif, surChoix, surSurvol, reessay
   return (
     <div className="carte !px-0 !py-1">
       <p className="cache-visuel" role="status" aria-live="polite">
-        {nbProduits} produit{nbProduits > 1 ? 's' : ''} connu{nbProduits > 1 ? 's' : ''}, {nbLignes} ligne{nbLignes > 1 ? 's' : ''} de liste. Flèches pour parcourir, Entrée pour ouvrir.
+        {pluriel(nbProduits, 'produit connu', 'produits connus')}, {pluriel(nbLignes, 'ligne', 'lignes')} de liste. Flèches pour parcourir, Entrée pour ouvrir.
       </p>
       <ul id="suggestions" role="listbox" aria-label="Suggestions" className="m-0 list-none p-0">
         {nbProduits > 0 ? (

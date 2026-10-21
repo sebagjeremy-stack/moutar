@@ -11,7 +11,7 @@ import { Emoji } from '../../components/Emoji';
 import { envoyer, lire } from '../../lib/api';
 import { formaterEan, formaterJourCivil, jourLocal } from '../../lib/dates';
 import { phraseErreur } from '../../lib/erreurs';
-import { AUTEUR_NOM_MAX, corpsProposition, erreursProposition, HOTES_PREUVE, SOURCE_TEXTE_MAX, type ErreursProposition } from './contribution-regles';
+import { AUTEUR_NOM_MAX, corpsProposition, erreursProposition, HOTES_PREUVE, preuveGardee, SOURCE_TEXTE_MAX, type ErreursProposition } from './contribution-regles';
 
 /*
  * /produit/:ean/contribution — « Proposer une contribution » (lot 5) : une question par écran, mobile, pouce droit.
@@ -23,10 +23,12 @@ import { AUTEUR_NOM_MAX, corpsProposition, erreursProposition, HOTES_PREUVE, SOU
 type Etape = 1 | 2 | 3 | 4;
 type Envoi = { phase: 'saisie'; erreur: string | null } | { phase: 'envoi' } | { phase: 'envoye' };
 
-const STATUTS: Array<{ valeur: StatutContribution; titre: string; aide: string; accent: 1 | 2 | 3 }> = [
-  { valeur: 'cite', titre: 'Le produit est cité comme cacher', aide: 'La source le dit permis (une liste, un message validé par le groupe).', accent: 3 },
-  { valeur: 'douteux', titre: 'Le produit est signalé douteux', aide: 'La source invite à vérifier avant d’acheter. Jamais un « non cacher » : Moutar cite, il ne décide pas.', accent: 2 },
-  { valeur: 'non_cite', titre: 'Le produit n’est pas cité', aide: 'La source ne le mentionne pas. Ce n’est pas un « non ».', accent: 1 },
+/* Les trois choix ont le MÊME fond neutre (lavande doux, `accent-4-soft`) : aucune couleur ne doit suggérer un verdict avant
+ * que la source ne parle (21/10/2026) ; la sélection se lit par la bordure lavande et le mot « Choisi ». */
+const STATUTS: Array<{ valeur: StatutContribution; titre: string; aide: string }> = [
+  { valeur: 'cite', titre: 'Le produit est cité comme cacher', aide: 'La source le dit permis (une liste, un message validé par le groupe).' },
+  { valeur: 'douteux', titre: 'Le produit est signalé douteux', aide: 'La source invite à vérifier avant d’acheter. Jamais un « non cacher » : Moutar cite, il ne décide pas.' },
+  { valeur: 'non_cite', titre: 'Le produit n’est pas cité', aide: 'La source ne le mentionne pas. Ce n’est pas un « non ».' },
 ];
 
 const SOURCES: Array<{ valeur: SourceContribution; aide: string }> = [
@@ -44,6 +46,7 @@ export function ContributionPage() {
   const [produit, setProduit] = useState<Pick<Produit, 'nom' | 'marque'> | null>(null);
   const [etape, setEtape] = useState<Etape>(1);
   const [statut, setStatut] = useState<StatutContribution | null>(null);
+  const [sansChoix, setSansChoix] = useState(false);
   const [source, setSource] = useState<SourceContribution>('lbpc');
   const [texte, setTexte] = useState('');
   const [date, setDate] = useState('');
@@ -148,7 +151,7 @@ export function ContributionPage() {
       <Ecran
         barre={barre}
         pied={
-          <Bouton variante="primaire" bloc aria-disabled={statut ? undefined : 'true'} onClick={() => statut && setEtape(2)}>
+          <Bouton variante="primaire" bloc aria-disabled={statut ? undefined : 'true'} onClick={() => (statut ? setEtape(2) : setSansChoix(true))}>
             Continuer
           </Bouton>
         }
@@ -160,11 +163,26 @@ export function ContributionPage() {
           <ul className="flex flex-col gap-3" role="list">
             {STATUTS.map((s) => (
               <li key={s.valeur}>
-                <Choix nom="statut" choisi={statut === s.valeur} classe={CLASSE_ACCENT[s.accent]} surChoix={() => setStatut(s.valeur)} titre={s.titre} aide={s.aide} />
+                <Choix
+                  nom="statut"
+                  choisi={statut === s.valeur}
+                  classe={CLASSE_ACCENT[4]}
+                  surChoix={() => {
+                    setStatut(s.valeur);
+                    setSansChoix(false);
+                  }}
+                  titre={s.titre}
+                  aide={s.aide}
+                />
               </li>
             ))}
           </ul>
         </fieldset>
+        {sansChoix && !statut ? (
+          <Bandeau ton="warn" role="alert">
+            Choisissez d’abord ce que dit la source.
+          </Bandeau>
+        ) : null}
       </Ecran>
     );
   }
@@ -222,6 +240,7 @@ export function ContributionPage() {
         <form
           id="formulaire-source"
           className="flex flex-col gap-3"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
             versEtape4();
@@ -258,6 +277,8 @@ export function ContributionPage() {
   }
 
   const choixStatut = STATUTS.find((s) => s.valeur === statut);
+  // Le lien affiché est celui que le serveur GARDERA (règle partagée : sans fragment ni `fbclid` / `utm_*`).
+  const lienPreuve = preuveGardee(preuve, HOTES_PREUVE);
   return (
     <Ecran
       barre={barre}
@@ -285,7 +306,16 @@ export function ContributionPage() {
             <span className="whitespace-pre-line">{texte.trim()}</span>
           </Ligne>
           <Ligne terme="Date">{date ? formaterJourCivil(date) : 'non datée'}</Ligne>
-          <Ligne terme="Lien de preuve">{preuve.trim() ? <span className="break-all">{preuve.trim()}</span> : 'aucun'}</Ligne>
+          <Ligne terme="Lien de preuve">
+            {lienPreuve ? (
+              <>
+                <span className="break-all">{lienPreuve.lien}</span>
+                {lienPreuve.modifie ? <span className="muet"> (paramètres de suivi retirés)</span> : null}
+              </>
+            ) : (
+              'aucun'
+            )}
+          </Ligne>
           <Ligne terme="Pseudonyme">{pseudo.trim() || 'anonyme'}</Ligne>
         </dl>
         <p className="muet mt-3">Votre contribution sera relue à la console avant d’apparaître sur la fiche. Rien n’est gardé sur ce téléphone.</p>
@@ -302,7 +332,7 @@ export function ContributionPage() {
   );
 }
 
-/** Une grande carte radio (fond d'accent décoratif, bordure lavande quand choisie, le mot « Choisi » écrit). */
+/** Une grande carte radio (fond doux décoratif, bordure lavande quand choisie, le mot « Choisi » écrit). */
 function Choix({ nom, choisi, classe, surChoix, titre, aide }: { nom: string; choisi: boolean; classe: string; surChoix: () => void; titre: string; aide: string }) {
   return (
     <label className={`choix-seuil ${classe} ${choisi ? 'choix-seuil-choisi' : ''}`}>

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import type { TableauConsole } from '@moutar/shared-types';
 import { formaterJourCivil } from '../../lib/dates';
 import { EtatNonLu, useLecture } from './lecture';
+import type { Refus } from './outils';
 
 /*
  * Le tableau de bord de la console (lot 5) : quatre COMPTES, jamais une personne — produits lus, contributions en
@@ -9,7 +10,6 @@ import { EtatNonLu, useLecture } from './lecture';
  * son onglet. Les fonds d'accent sont décoratifs (un par tuile) ; le chiffre n'est jamais une alerte par la seule couleur.
  */
 
-type Refus = (statut: number) => void;
 const nombre = (n: number) => n.toLocaleString('fr-FR');
 
 export function Tableau({ surRefus }: { surRefus: Refus }) {

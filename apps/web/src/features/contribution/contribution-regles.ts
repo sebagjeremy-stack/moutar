@@ -1,4 +1,5 @@
 import type { PropositionContribution } from '@moutar/shared-types';
+import { preuveUrlAdmise } from '@moutar/shared-types/regles/preuve';
 
 /*
  * Lot 5 : la validation LOCALE d'une contribution (pure, testée), avant l'envoi — le serveur reste le juge
@@ -36,20 +37,27 @@ export function pseudonymeAdmis(nom: string): boolean {
   return n === '' || (n.length <= AUTEUR_NOM_MAX && !n.includes('@'));
 }
 
-/** Pure : un lien de preuve est vide, ou en https vers un hôte admis ou l'un de ses sous-domaines (`m.facebook.com`). */
+/**
+ * Pure : un lien de preuve est vide, ou admis par la règle PARTAGÉE (`@moutar/shared-types/regles/preuve` : https, hôte admis
+ * ou sous-domaine — celle que le serveur applique) et pas plus long que 2 000 caractères.
+ */
 export function preuveAdmise(url: string, hotes: readonly string[] = HOTES_PREUVE): boolean {
   const u = url.trim();
   if (u === '') return true;
   if (u.length > PREUVE_URL_MAX) return false;
-  let parsee: URL;
-  try {
-    parsee = new URL(u);
-  } catch {
-    return false;
-  }
-  if (parsee.protocol !== 'https:' || parsee.username || parsee.password) return false;
-  const hote = parsee.hostname.toLowerCase();
-  return hotes.some((h) => hote === h || hote.endsWith(`.${h}`));
+  return preuveUrlAdmise(u, hotes) !== null;
+}
+
+/**
+ * Pure : le lien tel que le serveur le GARDERA (fragment et paramètres de pistage `fbclid` / `utm_*` retirés), et s'il
+ * diffère du lien saisi — pour le dire au récapitulatif. Vide → null.
+ */
+export function preuveGardee(url: string, hotes: readonly string[] = HOTES_PREUVE): { lien: string; modifie: boolean } | null {
+  const u = url.trim();
+  if (u === '') return null;
+  const admise = preuveUrlAdmise(u, hotes);
+  if (admise === null) return { lien: u, modifie: false };
+  return { lien: admise, modifie: admise !== u };
 }
 
 /** Pure : le texte de la source est non vide et ≤ 1 000 caractères (après repli des espaces de bord). */

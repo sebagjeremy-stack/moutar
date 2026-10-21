@@ -8,6 +8,7 @@ import { Pastille } from '../../components/Pastille';
 import { envoyer } from '../../lib/api';
 import { formaterEan, formaterJour, formaterJourCivil } from '../../lib/dates';
 import { phraseErreur } from '../../lib/erreurs';
+import { pluriel } from '../../lib/texte';
 import { nomSource, pastilleContribution } from '../produit/niveau-3-regles';
 import { EtatNonLu, useLecture } from './lecture';
 import { Filtre, TexteCopiable, type Refus } from './outils';
@@ -25,6 +26,8 @@ const ETATS: ReadonlyArray<[EtatContribution, string]> = [
   ['validee', 'Validées'],
   ['refusee', 'Refusées'],
 ];
+/** L'accord du compte en tête (« 1 proposée », « 2 validées »). */
+const ACCORD_ETAT: Record<EtatContribution, [string, string]> = { proposee: ['proposée', 'proposées'], validee: ['validée', 'validées'], refusee: ['refusée', 'refusées'] };
 const LIBELLE_ETAT: Record<EtatContribution, string> = { proposee: 'En attente', validee: 'Validée', refusee: 'Refusée' };
 
 function etatDepuis(valeur: string | null): EtatContribution {
@@ -60,7 +63,7 @@ export function Contributions({ surRefus }: { surRefus: Refus }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 id="titre-contributions" className="text-17 font-semibold">
-            Contributions · {etat.data.length} {ETATS.find(([e]) => e === etatFiltre)?.[1].toLowerCase()}
+            Contributions · {pluriel(etat.data.length, ...ACCORD_ETAT[etatFiltre])}
           </h1>
           <p className="muet">Valider écrit la ligne de niveau 3 de la fiche (la plus récente par le jour de sa source) ; refuser la retire. Chaque décision s’écrit au journal.</p>
         </div>
@@ -119,8 +122,9 @@ function LigneContribution({ c, surRefus, surDecidee, surDejaTraitee }: { c: Con
 
   return (
     <li className="flex flex-col gap-2 py-3">
+      {/* Au téléphone, le nom du produit prend toute la largeur ; les pastilles passent sur leur ligne. */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 grow basis-full sm:basis-0">
           {c.produit.ean ? (
             <Link to={`/produit/${c.produit.ean}`} className="font-semibold text-text">
               {c.produit.nom}
