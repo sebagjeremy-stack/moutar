@@ -10,6 +10,7 @@ const ScanPage = differe(() => import('./features/scan/ScanPage'), 'ScanPage');
 const ProduitPage = differe(() => import('./features/produit/ProduitPage'), 'ProduitPage');
 const IngredientsPage = differe(() => import('./features/produit/IngredientsPage'), 'IngredientsPage');
 const LogoPage = differe(() => import('./features/certification/LogoPage'), 'LogoPage');
+const ContributionPage = differe(() => import('./features/contribution/ContributionPage'), 'ContributionPage');
 const HistoriquePage = differe(() => import('./features/historique/HistoriquePage'), 'HistoriquePage');
 const AdminPage = differe(() => import('./features/admin/AdminPage'), 'AdminPage');
 
@@ -33,6 +34,7 @@ export function App() {
         <Route path="/produit/:ean" element={<ProduitPage />} />
         <Route path="/produit/:ean/ingredients" element={<IngredientsPage />} />
         <Route path="/produit/:ean/logo" element={<LogoPage />} />
+        <Route path="/produit/:ean/contribution" element={<ContributionPage />} />
         <Route path="/historique" element={<HistoriquePage />} />
         <Route path="/admin/*" element={<AdminPage />} />
         <Route

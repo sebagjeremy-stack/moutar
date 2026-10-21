@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { CarteProduit, LigneCarte, Produit, SousLigneListe, Ton } from '@moutar/shared-types';
-import { libelleNiveau } from '@moutar/shared-types/regles/niveaux';
+import type { CarteProduit, ContributionsProduit, LigneCarte, Niveau, Produit, SignalementCree, SousLigneListe, Ton } from '@moutar/shared-types';
+import { libelleNiveau, NIVEAUX } from '@moutar/shared-types/regles/niveaux';
 import { Bandeau } from '../../components/Bandeau';
 import { Bouton, BoutonLien } from '../../components/Bouton';
 import { Carte } from '../../components/Carte';
@@ -18,7 +18,9 @@ import { noterDansHistorique } from '../../lib/historique';
 import { lireSeuilLocal } from '../../lib/stockage-local';
 import { IngredientsEnGras } from './IngredientsEnGras';
 import { Partager } from './Partager';
+import { datesContribution, pastilleContribution, sourceTronquee } from './niveau-3-regles';
 import { datesSousLigne, pastilleSousLigne, precisionSousLigne, SANS_LISTE } from './sous-lignes-regles';
+import { SIGNALEMENT_TEXTE_MAX } from '../contribution/contribution-regles';
 
 /** La bordure de la synthèse, en toutes lettres pour Tailwind ; aucune pour « neutre ». */
 const CLASSE_SYNTHESE: Record<Ton, string> = { ok: 'synthese-ok', warn: 'synthese-warn', danger: 'synthese-danger', neutre: '' };
@@ -93,12 +95,14 @@ function CarteProduitVue({ carte, barre, surRelire }: { carte: CarteProduit; bar
   const { produit: p, synthese, lignes } = carte;
   const ingredients = p.ingredientsTexte;
   const codes = carte.analyse?.additifs.map((a) => a.code) ?? [];
+  // « Signaler une erreur » : un panneau EN PLACE au bas de la fiche (jamais une nouvelle fenêtre), ouvert depuis le pied.
+  const [signalerOuvert, setSignalerOuvert] = useState(false);
   return (
     <Ecran
       barre={barre}
       pied={
         <>
-          <Bouton className="flex-1 whitespace-nowrap px-[10px]" aria-disabled="true" title="Le signalement arrive au lot 5" onClick={(e) => e.preventDefault()}>
+          <Bouton className="flex-1 whitespace-nowrap px-[10px]" aria-expanded={signalerOuvert} aria-controls="panneau-signalement" aria-disabled={p.ean ? undefined : 'true'} title={p.ean ? undefined : 'Cette fiche n’a pas de code-barres : rien à signaler ici'} onClick={() => p.ean && setSignalerOuvert(!signalerOuvert)}>
             Signaler une erreur
           </Bouton>
           <BoutonLien to="/" variante="primaire" className="flex-1 whitespace-nowrap px-[10px]">
@@ -173,17 +177,13 @@ function CarteProduitVue({ carte, barre, surRelire }: { carte: CarteProduit; bar
         )}
         <p className="muet mt-[10px]">{p.source === 'off' ? 'Données Open Food Facts · ODbL' : 'Saisie manuelle · Open Food Facts (ODbL) pour les fiches lues'}</p>
       </details>
+
+      {signalerOuvert && p.ean ? <PanneauSignalement ean={p.ean} surFermer={() => setSignalerOuvert(false)} /> : null}
     </Ecran>
   );
 }
 
-/** Ce que le niveau proposera plus tard : un texte muet, sans apparence de lien (rien à cliquer avant le lot). */
-const A_VENIR: Record<number, string> = {
-  3: 'Proposer une contribution · bientôt (lot 5)',
-};
-
 function LigneNiveau({ ligne, ean, tagsIgnores, surRelire }: { ligne: LigneCarte; ean: string | null; tagsIgnores: number; surRelire: () => void }) {
-  const aVenir = A_VENIR[ligne.niveau];
   // Niveau 2 (lot 2) : une sous-ligne PAR liste officielle, chacune avec sa pastille, sa date et sa validité — la pastille
   // et le détail du niveau ne se répètent pas (une information n'est écrite qu'une fois par vue).
   const sousLignes = ligne.niveau === 2 ? ligne.sousLignes : undefined;
@@ -208,6 +208,7 @@ function LigneNiveau({ ligne, ean, tagsIgnores, surRelire }: { ligne: LigneCarte
         </Bandeau>
       ) : null}
       {ligne.niveau === 1 && ean ? <ActionsNiveau1 ligne={ligne} ean={ean} surRelire={surRelire} /> : null}
+      {ligne.niveau === 3 && ean ? <ActionsNiveau3 ligne={ligne} ean={ean} /> : null}
       {ligne.niveau === 4 && ligne.composition === null && ean ? (
         <Link to={`/produit/${ean}/ingredients`} className="lien ml-[42px]">
           Saisir les ingrédients
@@ -218,8 +219,172 @@ function LigneNiveau({ ligne, ean, tagsIgnores, surRelire }: { ligne: LigneCarte
           {tagsIgnores} additif{tagsIgnores > 1 ? 's' : ''} non lu{tagsIgnores > 1 ? 's' : ''} (tags Open Food Facts que le code ne sait pas lire).
         </p>
       ) : null}
-      {aVenir ? <p className="muet ml-[42px] mt-[6px]">{aVenir}</p> : null}
     </li>
+  );
+}
+
+type Validees = { phase: 'chargement' } | { phase: 'ok'; data: ContributionsProduit } | { phase: 'echec'; message: string };
+
+/**
+ * Niveau 3 (lot 5) : « Proposer une contribution » tant qu'aucune validée ne fonde la ligne (`proposerContribution`,
+ * décidé par le serveur), et la liste des contributions VALIDÉES, repliée, lue à part (`GET …/contributions`) : chacune
+ * avec sa pastille (le mot à côté de la couleur), sa source tronquée, ses dates. En chargement ou en échec, jamais « aucune ».
+ */
+function ActionsNiveau3({ ligne, ean }: { ligne: LigneCarte; ean: string }) {
+  const [validees, setValidees] = useState<Validees>({ phase: 'chargement' });
+  const charger = useCallback(async () => {
+    setValidees({ phase: 'chargement' });
+    const r = await lire<ContributionsProduit>(`/api/v1/produits/${encodeURIComponent(ean)}/contributions`);
+    setValidees(r.ok ? { phase: 'ok', data: r.data } : { phase: 'echec', message: phraseErreur(r) });
+  }, [ean]);
+  useEffect(() => {
+    void charger();
+  }, [charger]);
+
+  const n = validees.phase === 'ok' ? validees.data.contributions.length : null;
+  const resume = validees.phase === 'chargement' ? 'Contributions validées · lecture…' : validees.phase === 'echec' ? 'Contributions validées · non lues' : `Voir les contributions validées (${n})`;
+  return (
+    <div className="ml-[42px] mt-[6px] flex flex-col gap-1">
+      {ligne.proposerContribution ? (
+        <Link to={`/produit/${encodeURIComponent(ean)}/contribution`} className="lien self-start">
+          Proposer une contribution
+        </Link>
+      ) : null}
+      <details className="rounded-sm">
+        <summary className="lien cursor-pointer list-none" aria-live="polite">
+          <span className="flex items-center gap-1">
+            {resume}
+            <IconeChevron className="chevron h-5 w-5 flex-none" />
+          </span>
+        </summary>
+        {validees.phase === 'chargement' ? (
+          <p className="muet mt-1" role="status">
+            Lecture des contributions…
+          </p>
+        ) : validees.phase === 'echec' ? (
+          <Bandeau ton="warn" role="alert" className="mt-2 flex flex-wrap items-center gap-3">
+            <Pastille ton="warn">Non lu</Pastille>
+            <span className="flex-1">{validees.message}</span>
+            <Bouton className="min-h-[40px]" onClick={() => void charger()}>
+              Réessayer
+            </Bouton>
+          </Bandeau>
+        ) : (
+          <ContributionsValidees data={validees.data} />
+        )}
+      </details>
+    </div>
+  );
+}
+
+function ContributionsValidees({ data }: { data: ContributionsProduit }) {
+  return (
+    <>
+      {data.contributions.length === 0 ? <p className="muet mt-1">Aucune contribution validée pour l’instant.</p> : null}
+      {data.enAttente > 0 ? (
+        <p className="muet mt-1">
+          {data.enAttente} contribution{data.enAttente > 1 ? 's' : ''} en attente de validation à la console (rien ne compte avant).
+        </p>
+      ) : null}
+      {data.contributions.length > 0 ? (
+        <ul className="liste mt-1" role="list" aria-label="Contributions validées">
+          {data.contributions.map((c) => {
+            const pastille = pastilleContribution(c.statutPropose, c.sourceType);
+            return (
+              <li key={c.id} className="py-2">
+                <div className="flex flex-wrap items-center gap-x-[10px] gap-y-[6px]">
+                  <p className="min-w-0 flex-auto">« {sourceTronquee(c.sourceTexte)} »</p>
+                  <Pastille ton={pastille.ton} className="max-w-full">
+                    {pastille.mot}
+                  </Pastille>
+                </div>
+                <p className="muet mt-1">{datesContribution(c)}</p>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
+type EnvoiSignalement = { phase: 'saisie'; erreur: string | null } | { phase: 'envoi' } | { phase: 'envoye' };
+
+/** « Signaler une erreur » : le niveau concerné (les mots), un texte ≤ 500, « Envoyer » → « Merci, c’est noté. » ; 429 dit d'attendre. */
+function PanneauSignalement({ ean, surFermer }: { ean: string; surFermer: () => void }) {
+  const [niveau, setNiveau] = useState<Niveau | null>(null);
+  const [texte, setTexte] = useState('');
+  const [envoi, setEnvoi] = useState<EnvoiSignalement>({ phase: 'saisie', erreur: null });
+  const panneau = useRef<HTMLElement>(null);
+  useEffect(() => {
+    // Le panneau s'ouvre au bas de la fiche : on l'amène sous les yeux et au clavier (jamais une nouvelle fenêtre).
+    panneau.current?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    panneau.current?.querySelector<HTMLElement>('input, textarea')?.focus({ preventScroll: true });
+  }, []);
+
+  const envoyerSignalement = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!niveau) {
+      setEnvoi({ phase: 'saisie', erreur: 'Choisissez le niveau concerné.' });
+      return;
+    }
+    if (!texte.trim()) {
+      setEnvoi({ phase: 'saisie', erreur: 'Dites en quelques mots ce qui est faux.' });
+      return;
+    }
+    setEnvoi({ phase: 'envoi' });
+    const r = await envoyer<SignalementCree>(`/api/v1/produits/${encodeURIComponent(ean)}/signalements`, { niveau, texte: texte.trim() });
+    if (r.ok) setEnvoi({ phase: 'envoye' });
+    else setEnvoi({ phase: 'saisie', erreur: r.statut === 429 ? 'Trop de signalements pour l’instant, réessayez plus tard.' : phraseErreur(r) });
+  };
+
+  return (
+    <section id="panneau-signalement" ref={panneau} className="carte" aria-labelledby="titre-signalement">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="titre-signalement" className="text-18 font-bold">
+          Signaler une erreur
+          <Emoji>✍️</Emoji>
+        </h2>
+        <button type="button" className="lien" onClick={surFermer}>
+          Fermer
+        </button>
+      </div>
+      {envoi.phase === 'envoye' ? (
+        <p role="status" className="mt-2">
+          Merci, c’est noté. L’équipe relira la fiche à la console.
+        </p>
+      ) : (
+        <form className="mt-2 flex flex-col gap-3" onSubmit={envoyerSignalement}>
+          <fieldset className="m-0 border-0 p-0">
+            <legend className="mb-1 font-semibold">Niveau concerné</legend>
+            <ul className="flex flex-col" role="list">
+              {NIVEAUX.map((n) => (
+                <li key={n}>
+                  <label className="flex min-h-tap cursor-pointer items-center gap-3">
+                    <input type="radio" name="niveau-signale" value={n} checked={niveau === n} onChange={() => setNiveau(n)} className="h-5 w-5 accent-primary" />
+                    <span>{libelleNiveau(n)}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+          <div>
+            <ZoneTexte id="signalement-texte" etiquette="Ce qui est faux" aide="En quelques mots : la source, la date, ce que vous avez vu. Ni nom, ni e-mail." value={texte} onChange={(e) => setTexte(e.target.value)} maxLength={SIGNALEMENT_TEXTE_MAX} required className="min-h-[100px]" />
+            <p className="muet mt-1 text-right" aria-live="polite">
+              {texte.trim().length} / {SIGNALEMENT_TEXTE_MAX}
+            </p>
+          </div>
+          {envoi.phase === 'saisie' && envoi.erreur ? (
+            <Bandeau ton="warn" role="alert">
+              {envoi.erreur}
+            </Bandeau>
+          ) : null}
+          <Bouton type="submit" variante="primaire" bloc disabled={envoi.phase === 'envoi'}>
+            {envoi.phase === 'envoi' ? 'Envoi…' : 'Envoyer'}
+          </Bouton>
+        </form>
+      )}
+    </section>
   );
 }
 

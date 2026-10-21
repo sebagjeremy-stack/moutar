@@ -41,6 +41,9 @@ const PHRASES: Readonly<Record<string, string>> = {
   date_invalide: 'Le jour de la source doit être un jour du calendrier (AAAA-MM-JJ), au plus tard aujourd’hui.',
   pseudonyme_invalide: 'Un pseudonyme, pas votre nom ni votre e-mail : retirez le « @ ».',
   preuve_refusee: 'Le lien de preuve doit être en https et pointer vers Facebook ou lesbonsplanscachers.fr.',
+  contribution_inconnue: 'Cette contribution n’existe pas (ou plus).',
+  signalement_inconnu: 'Ce signalement n’existe pas (ou plus).',
+  etat_identique: 'Déjà traitée : cette ligne est déjà dans cet état.',
   // Lot 4 : dictée de secours (`POST /transcriptions`).
   audio_absent: 'Aucun enregistrement n’est parti : réessayez, ou tapez le nom.',
   type_audio_refuse: 'Ce format d’enregistrement n’est pas accepté : tapez le nom.',

@@ -7,8 +7,13 @@ import { Champ } from '../../components/Champ';
 import { Pastille } from '../../components/Pastille';
 import { appel, envoyer, lire } from '../../lib/api';
 import { formaterJour } from '../../lib/dates';
+import { Certificateurs } from './Certificateurs';
+import { Contributions } from './Contributions';
+import { JournalIa } from './JournalIa';
 import { EtatNonLu, useLecture } from './lecture';
 import { ListeDetail, Listes } from './Listes';
+import { Signalements } from './Signalements';
+import { Tableau } from './Tableau';
 
 interface Session {
   email: string;
@@ -27,18 +32,29 @@ interface LigneJournal {
   email: string | null;
 }
 
-type Onglet = 'additifs' | 'produits' | 'journal' | 'listes';
+type Onglet = 'tableau' | 'contributions' | 'signalements' | 'additifs' | 'certificateurs' | 'listes' | 'produits' | 'journal' | 'journal-ia';
+const ONGLETS: ReadonlyArray<[Onglet, string, string]> = [
+  ['tableau', 'Tableau de bord', '/admin'],
+  ['contributions', 'Contributions', '/admin/contributions'],
+  ['signalements', 'Signalements', '/admin/signalements'],
+  ['additifs', 'Additifs', '/admin/additifs'],
+  ['certificateurs', 'Certificateurs', '/admin/certificateurs'],
+  ['listes', 'Listes', '/admin/listes'],
+  ['produits', 'Produits', '/admin/produits'],
+  ['journal', 'Journal', '/admin/journal'],
+  ['journal-ia', 'Journal IA', '/admin/journal-ia'],
+];
 
-/** L'onglet se lit dans l'adresse (`/admin`, `/admin/produits`, `/admin/journal`, `/admin/listes`) : un lien y mène. */
+/** L'onglet se lit dans l'adresse (`/admin` = le tableau de bord, `/admin/contributions`, `/admin/additifs`…) : un lien y mène. */
 function ongletDepuisChemin(chemin: string): Onglet {
   const reste = chemin.replace(/^\/admin\/?/, '').split('/')[0];
-  return reste === 'produits' || reste === 'journal' || reste === 'listes' ? reste : 'additifs';
+  return ONGLETS.find(([cle]) => cle === reste)?.[0] ?? 'tableau';
 }
 
 const LIBELLE_STATUT: Record<StatutAdditif, string> = { casher: 'Casher', douteux: 'Douteux', non_casher: 'Non casher', inconnu: 'Inconnu' };
 const TON_STATUT: Record<StatutAdditif, Ton> = { casher: 'ok', douteux: 'warn', non_casher: 'danger', inconnu: 'neutre' };
 
-/** /admin — connexion (e-mail + mot de passe), puis un tableau de bord sobre : Additifs, Produits, Listes, Journal. */
+/** /admin — connexion (e-mail + mot de passe), puis la console sobre : tableau de bord, contributions, signalements, additifs, certificateurs, listes, produits, journaux. */
 export function AdminPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
@@ -121,12 +137,6 @@ function Connexion({ surConnecte }: { surConnecte: () => Promise<void> }) {
 
 function TableauDeBord({ session, surDeconnecte }: { session: Session; surDeconnecte: () => void }) {
   const onglet = ongletDepuisChemin(useLocation().pathname);
-  const onglets: Array<[Onglet, string, string]> = [
-    ['additifs', 'Additifs', '/admin'],
-    ['produits', 'Produits', '/admin/produits'],
-    ['listes', 'Listes', '/admin/listes'],
-    ['journal', 'Journal', '/admin/journal'],
-  ];
   const surRefus = useCallback(
     (statut: number) => {
       if (statut === 401 || statut === 403) surDeconnecte();
@@ -151,7 +161,7 @@ function TableauDeBord({ session, surDeconnecte }: { session: Session; surDeconn
       }
     >
       <nav aria-label="Sections" className="flex flex-wrap gap-2">
-        {onglets.map(([cle, libelle, chemin]) => (
+        {ONGLETS.map(([cle, libelle, chemin]) => (
           <Link key={cle} to={chemin} className={`btn min-h-[40px] ${onglet === cle ? 'border-primary bg-primary-soft text-primary-strong' : ''}`} aria-current={onglet === cle ? 'page' : undefined}>
             {libelle}
           </Link>
@@ -159,10 +169,33 @@ function TableauDeBord({ session, surDeconnecte }: { session: Session; surDeconn
       </nav>
       <Routes>
         <Route path="listes/:id" element={<ListeDetail surRefus={surRefus} />} />
-        <Route path="*" element={onglet === 'additifs' ? <Additifs surRefus={surRefus} /> : onglet === 'produits' ? <Produits surRefus={surRefus} /> : onglet === 'listes' ? <Listes surRefus={surRefus} /> : <Journal surRefus={surRefus} />} />
+        <Route path="*" element={<OngletCourant onglet={onglet} surRefus={surRefus} />} />
       </Routes>
     </Coquille>
   );
+}
+
+function OngletCourant({ onglet, surRefus }: { onglet: Onglet; surRefus: (s: number) => void }) {
+  switch (onglet) {
+    case 'tableau':
+      return <Tableau surRefus={surRefus} />;
+    case 'contributions':
+      return <Contributions surRefus={surRefus} />;
+    case 'signalements':
+      return <Signalements surRefus={surRefus} />;
+    case 'additifs':
+      return <Additifs surRefus={surRefus} />;
+    case 'certificateurs':
+      return <Certificateurs surRefus={surRefus} />;
+    case 'listes':
+      return <Listes surRefus={surRefus} />;
+    case 'produits':
+      return <Produits surRefus={surRefus} />;
+    case 'journal':
+      return <Journal surRefus={surRefus} />;
+    case 'journal-ia':
+      return <JournalIa surRefus={surRefus} />;
+  }
 }
 
 function Additifs({ surRefus }: { surRefus: (s: number) => void }) {
