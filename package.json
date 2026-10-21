@@ -12,13 +12,16 @@
     "db:generate": "pnpm --filter @moutar/api db:generate",
     "db:seed-admin": "pnpm --filter @moutar/api db:seed-admin",
     "db:droits": "pnpm --filter @moutar/api db:droits",
+    "db:seed-e2e": "pnpm --filter @moutar/api db:seed-e2e",
+    "e2e": "playwright test --reporter=line",
+    "e2e:setup": "playwright test --project=setup --reporter=line",
     "dev": "pnpm db:start && concurrently -n api,web -c blue,green \"pnpm --filter @moutar/api dev\" \"pnpm --filter @moutar/web dev\"",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "build": "pnpm -r build"
   },
   "devDependencies": {
-    "@playwright/test": "^1.56.1",
+    "@playwright/test": "^1.64.1",
     "concurrently": "^9.1.0",
     "typescript": "^5.6.3"
   }

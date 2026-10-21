@@ -65,6 +65,14 @@ export function AccueilPage() {
     dictee.demarrer();
   };
   const noteDictee = messageDictee ?? (dictee.etat.phase === 'echec' ? dictee.etat.message : dictee.etat.phase === 'envoi' ? 'Transcription…' : null);
+  // Le moteur a entendu quelque chose sans certitude (confiance sous 0,5) : le texte est PROPOSÉ dans une carte ambre, rien
+  // n'est cherché tant que l'utilisateur n'a pas dit « Oui » (`confirmer` : le champ, puis les suggestions) ; « Non » écarte.
+  const incertain = dictee.etat.phase === 'incertain' ? dictee.etat : null;
+  const ecarterDictee = () => {
+    dictee.ignorer();
+    setOuvert(true);
+    setTimeout(() => champ.current?.focus(), 0);
+  };
   const options = ferme ? [] : optionsDe(etat);
   const listeOuverte = options.length > 0;
 
@@ -178,6 +186,22 @@ export function AccueilPage() {
         <p className="text-center font-semibold" role="status">
           Dites le nom du produit ou sa marque ; appuyez de nouveau pour arrêter.
         </p>
+      ) : incertain ? (
+        <Carte className="synthese-warn" role="status" aria-labelledby="titre-dictee-incertaine" data-dictee="incertaine">
+          <div className="mb-2 flex flex-wrap items-center gap-x-[10px] gap-y-2">
+            <h2 id="titre-dictee-incertaine" className="flex-auto text-18 font-bold">
+              J’ai entendu : « {incertain.texte} » — c’est bien ça ?
+            </h2>
+            <Pastille ton="warn">À confirmer</Pastille>
+          </div>
+          <p>Le moteur n’est pas sûr : rien n’est cherché avant votre réponse. Vous pouvez aussi taper le nom.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Bouton variante="primaire" onClick={dictee.confirmer}>
+              Oui, chercher
+            </Bouton>
+            <Bouton onClick={ecarterDictee}>Non</Bouton>
+          </div>
+        </Carte>
       ) : noteDictee ? (
         <Bandeau ton="warn" role="status">
           {noteDictee}

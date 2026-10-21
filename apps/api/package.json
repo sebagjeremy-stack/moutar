@@ -11,6 +11,7 @@
     "db:migrate": "tsx src/database/migrate.ts",
     "db:seed-admin": "tsx src/database/seed-admin.ts",
     "db:droits": "tsx src/database/droits.ts",
+    "db:seed-e2e": "tsx src/scripts/seed-e2e.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

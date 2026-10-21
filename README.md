@@ -37,6 +37,15 @@ pnpm dev                                   # API http://localhost:3100/api/v1/he
 - Relancer la pile : `bash scripts/dev-restart.sh` (journal dans `.devstack/dev.log`) ; arrêter la base : `pnpm db:stop`.
 - Monorepo : `apps/api` (NestJS + Drizzle + zod), `apps/web` (React + Vite + Tailwind, PWA), `packages/shared-types` (types, règles pures `regles/`, catalogues `catalogues/`).
 
+## Tests
+- Unitaires (vitest, partout) : `pnpm test` ; typecheck : `pnpm typecheck`.
+- Bout-en-bout (Playwright, Chromium headless, parcours réels contre la pile de développement) : pile démarrée
+  (`bash scripts/dev-restart.sh`), graine `pnpm db:seed-e2e` (idempotente : produits fictifs à EAN fixes et compte de console
+  `e2e@exemple.fr`, mot de passe lu dans `E2E_ADMIN_PASSWORD` ou imprimé une fois), puis `pnpm e2e`. Trois projets :
+  `setup` (une seule connexion à la console, cookies rejoués), `mobile` (iPhone 13, 390 × 844) et `console` (1 100 px).
+  **Jamais un appel réel au moteur d'IA** (logo, OCR, transcription : routes interceptées) ; les tests nettoient ce qu'ils
+  créent ; une seule passe à la fois. Prérequis, commandes et pièges : [`e2e/README.md`](e2e/README.md).
+
 ## Mise en ligne
 Runbook complet dans [`deploy/README.md`](deploy/README.md) (VPS OVH, DNS, `.env.prod`, première mise en ligne, mise à jour,
 sauvegarde et restauration, retour arrière) ; règles de base et check-list dans [`docs/deploiement.md`](docs/deploiement.md).
